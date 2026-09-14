@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-09-14T09:44:34",
+  "purpose": "Fallback for the Db2 path, and the 'before' artefact. Row counts and control totals below are the TRUTH and must match what Db2 returns for the same window. The file itself presents those values badly on purpose.",
+  "reconciliation_sql": "SELECT COUNT(*), SUM(AMOUNT) FROM NBKI.TRANSACTIONS WHERE TXN_TS >= '{month}-01-00.00.00' AND TXN_TS < '{next_month}-01-00.00.00'",
+  "files": [
+    {
+      "file": "Equation_Extract_2019-08.csv",
+      "month": "2019-08",
+      "data_rows_in_file": 118906,
+      "true_transaction_count": 118905,
+      "true_amount_total": "5028081.01",
+      "footer_total_shown_in_file": "5028157.76",
+      "duplicated_transaction_ref": "23327920",
+      "reconciliation_sql": "SELECT COUNT(*), SUM(AMOUNT) FROM NBKI.TRANSACTIONS WHERE TXN_TS >= '2019-08-01 00:00:00' AND TXN_TS < '2019-09-01 00:00:00'",
+      "note": "The file holds 118906 data rows but only 118905 real transactions: ref 23327920 is present twice. Bronze must dedupe, or the month over-reports.",
+      "rows_to_skip_before_header": 3,
+      "footer_rows_to_discard": 3
+    },
+    {
+      "file": "Equation_Extract_2019-09.csv",
+      "month": "2019-09",
+      "data_rows_in_file": 114772,
+      "true_transaction_count": 114771,
+      "true_amount_total": "4850069.83",
+      "footer_total_shown_in_file": "4850087.37",
+      "duplicated_transaction_ref": "23475060",
+      "reconciliation_sql": "SELECT COUNT(*), SUM(AMOUNT) FROM NBKI.TRANSACTIONS WHERE TXN_TS >= '2019-09-01 00:00:00' AND TXN_TS < '2019-10-01 00:00:00'",
+      "note": "The file holds 114772 data rows but only 114771 real transactions: ref 23475060 is present twice. Bronze must dedupe, or the month over-reports.",
+      "rows_to_skip_before_header": 3,
+      "footer_rows_to_discard": 3
+    },
+    {
+      "file": "Equation_Extract_2019-10.csv",
+      "month": "2019-10",
+      "data_rows_in_file": 117375,
+      "true_transaction_count": 117374,
+      "true_amount_total": "4990303.88",
+      "footer_total_shown_in_file": "4990409.68",
+      "duplicated_transaction_ref": "23616803",
+      "reconciliation_sql": "SELECT COUNT(*), SUM(AMOUNT) FROM NBKI.TRANSACTIONS WHERE TXN_TS >= '2019-10-01 00:00:00' AND TXN_TS < '2019-11-01 00:00:00'",
+      "note": "The file holds 117375 data rows but only 117374 real transactions: ref 23616803 is present twice. Bronze must dedupe, or the month over-reports.",
+      "rows_to_skip_before_header": 3,
+      "footer_rows_to_discard": 3
+    }
+  ],
+  "totals": {
+    "true_transaction_count": 351050,
+    "true_amount_total": "14868454.72",
+    "data_rows_across_files": 351053
+  }
+}

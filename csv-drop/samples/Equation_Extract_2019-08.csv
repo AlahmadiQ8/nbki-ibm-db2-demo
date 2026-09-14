@@ -1,0 +1,15 @@
+EQUATION CORE BANKING - CARD TRANSACTION EXTRACT
+Report run: 14/09/2026 09:44,Period: 2019-08
+
+Transaction Ref,Posting Date,Customer No,Card No,Card Brand,Card Type,Amount (USD),Entry Method,Merchant,Merchant City,Merchant State,Merchant Zip,MCC,Customer Age,Credit Score,Notes
+23327918,01/08/2019,316,****8985,Amex,Credit,136.60,Chip Transaction,20561,Houston,tx,77048,5912,36,719,
+23327919,2019-08-01,1248,****5401,Amex,Credit,$41.57,Online Transaction,81759,ONLINE, ,,7349,51,698,N/A
+23327920,01-Aug-2019,121,****3032,Visa,Debit,76.75,Chip Transaction,50783,Neenah,WI ,54956,5411,34,721,NULL
+23327920,01-Aug-2019,121,****3032,Visa,Debit,76.75,Chip Transaction,50783,Neenah,WI ,54956,5411,34,721,NULL
+23327921,01/08/2019,641,****7531,Mastercard,Debit,USD 99.10,Chip Transaction,23183,Columbus,OH,43228,5300,62,735,
+23327922,2019-08-01,496,****8197,Discover,Credit,19.45,Chip Transaction,86410,Mesquite,TX,75150,5211,47,730,N/A
+23327924,01-Aug-2019,1697,****2550,Visa,Debit,$0.49,Chip Transaction,66344,Teutopolis,il,62467,5411,64,685,NULL
+23327925,01/08/2019,1552,****3744,Mastercard,Debit,129.84,Chip Transaction,60569,Boise, ID,83705,5300,62,686,
+23327926,2019-08-01,1634,****8703,Mastercard,Debit,USD 3.42,Chip Transaction,75936,Brownsville,TX ,78520,5814,66,825,N/A
+23327927,01-Aug-2019,1585,****5063,Mastercard,Debit,33.30,Chip Transaction,69972,Jacksonville,FL,32222,5814,35,688,NULL
+23327928,01/08/2019,123,****3228,Mastercard,Debit,$14.58,Online Transaction,73186,ONLINE,,,4814,43,824,

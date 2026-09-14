@@ -1,0 +1,42 @@
+# Raw and prepared data are never committed.
+# Reasons: size (1.4 GB+ for computingvictor, up to 41 GB for the AML set) and
+# licence hygiene — we redistribute nothing, we only script the download.
+data/raw/
+data/prepared/
+data/*.csv
+data/*.json
+data/*.zip
+
+# Generated artefacts that contain dataset rows are not committed — same
+# reasoning as data/ above: we redistribute nothing, we script the fetch.
+# The small sample in csv-drop/samples/ IS tracked (both source datasets permit
+# redistribution, and 15 rows makes the shape visible without shipping a corpus).
+# NOTE: this means the CSV fallback must be GENERATED before the demo. Treat
+# ./scripts/07_make_csv_drop.py as a pre-flight step, not an optional extra.
+csv-drop/incoming/
+csv-drop/out/
+
+# Generated delta SQL carries dataset values; the manifest of expected results
+# is tracked because aggregates are not redistribution.
+db2/delta/*.sql
+
+# Db2 load artefacts
+db2/load/*.log
+db2/load/*.msg
+*.dmp
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Profiler output is regenerated, but the committed snapshot in docs/ is not.
+data/profile/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

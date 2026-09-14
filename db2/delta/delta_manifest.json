@@ -1,0 +1,128 @@
+{
+  "generated_at": "2026-09-14T09:43:23",
+  "seed": 991,
+  "base_max_transaction_id": 23761874,
+  "base_max_txn_ts": "2019-10-31 23:59:00",
+  "new_rows": 250,
+  "new_transaction_id_range": [
+    23761875,
+    23762124
+  ],
+  "updated_rows": 50,
+  "updated_transaction_ids": [
+    7597984,
+    8075842,
+    8960542,
+    9316003,
+    9330897,
+    9380369,
+    9404748,
+    9597000,
+    10529652,
+    10600491,
+    11075481,
+    11647244,
+    11727214,
+    11806412,
+    12859625,
+    13293971,
+    13829899,
+    14332070,
+    14363333,
+    15253778,
+    15575011,
+    16148302,
+    16320633,
+    16692132,
+    17132279,
+    17315027,
+    17390654,
+    17548603,
+    17775604,
+    17901242,
+    18838105,
+    18891077,
+    18922521,
+    19035511,
+    19051606,
+    19102251,
+    19238725,
+    19339739,
+    19928222,
+    19956937,
+    20328910,
+    21021939,
+    21031573,
+    21157693,
+    21600607,
+    22763096,
+    22890703,
+    23120957,
+    23177334,
+    23177738
+  ],
+  "rows_an_incremental_read_should_return": 300,
+  "clean_new_row_amount_total": "101447.00",
+  "new_row_amount_total": "20104278.18",
+  "updates_change_amount": false,
+  "planted_violations": [
+    {
+      "transaction_id": 23761881,
+      "rule": "implausible_amount"
+    },
+    {
+      "transaction_id": 23761908,
+      "rule": "state_case_mismatch"
+    },
+    {
+      "transaction_id": 23761918,
+      "rule": "duplicate_business_key"
+    },
+    {
+      "transaction_id": 23761920,
+      "rule": "zero_amount"
+    },
+    {
+      "transaction_id": 23761950,
+      "rule": "zero_amount"
+    },
+    {
+      "transaction_id": 23761982,
+      "rule": "state_whitespace"
+    },
+    {
+      "transaction_id": 23761984,
+      "rule": "negative_non_refund"
+    },
+    {
+      "transaction_id": 23762028,
+      "rule": "future_dated"
+    },
+    {
+      "transaction_id": 23762035,
+      "rule": "future_dated"
+    },
+    {
+      "transaction_id": 23762064,
+      "rule": "implausible_amount"
+    },
+    {
+      "transaction_id": 23762074,
+      "rule": "state_case_mismatch"
+    },
+    {
+      "transaction_id": 23762090,
+      "rule": "duplicate_business_key"
+    }
+  ],
+  "violation_summary": {
+    "duplicate_business_key": 2,
+    "future_dated": 2,
+    "implausible_amount": 2,
+    "negative_non_refund": 1,
+    "state_case_mismatch": 2,
+    "state_whitespace": 1,
+    "zero_amount": 2
+  },
+  "_note": "Structural corruption (orphan keys, missing required fields) is NOT here. Db2 enforces those constraints and we are not disabling them. That class of error arrives through the CSV-drop path instead, which is how it reaches a bank in reality."
+}

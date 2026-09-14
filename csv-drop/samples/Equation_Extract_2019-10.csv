@@ -1,0 +1,15 @@
+EQUATION CORE BANKING - CARD TRANSACTION EXTRACT
+Report run: 13/09/2026 14:46,Period: 2019-10
+
+Transaction Ref,Posting Date,Customer No,Card No,Card Brand,Card Type,Amount (USD),Entry Method,Merchant,Merchant City,Merchant State,Merchant Zip,MCC,Customer Age,Credit Score,Notes
+3748,02/10/2019,21,****2702,Mastercard,Debit,310.87,Swipe Transaction,86402,Chicago,ca,38834,5732,41,707,Bad PIN
+4201,2019-10-06,16,****2029,Discover,Credit,$791.19,Chip Transaction,12496,Houston, NY,80067,5912,29,561,Insufficient Balance
+3324,07-Oct-2019,404,****7155,Discover,Debit,396.42,Chip Transaction,67842,Seattle,OH ,11493,5912,48,690,NULL
+3324,07-Oct-2019,404,****7155,Discover,Debit,396.42,Chip Transaction,67842,Seattle,OH ,11493,5912,48,690,NULL
+2934,09/10/2019,277,****1388,Mastercard,Debit (Prepaid),USD 505.53,Online Transaction,47825,Los Angeles,NY,51318,5812,80,619,Bad PIN
+4453,2019-10-10,8,****4237,Visa,Debit,476.82,Swipe Transaction,14936,Chicago,IL,34419,5812,40,539,N/A
+2439,10-Oct-2019,172,****9389,Mastercard,Debit,($117.49),Online Transaction,73379,Seattle,ga,45929,4121,33,822,Technical Glitch
+3240,10/10/2019,319,****2909,Visa,Debit,676.79,Swipe Transaction,20785,New York, NY,78789,3001,27,743,
+2457,2019-10-10,32,****5553,Visa,Debit (Prepaid),USD 794.34,Swipe Transaction,93095,Seattle,NY ,61609,4121,41,699,N/A
+1243,10-Oct-2019,358,****2263,Visa,Debit (Prepaid),347.71,Online Transaction,67534,Miami,MA,51569,5732,19,762,Bad PIN
+4104,11/10/2019,294,****0911,Visa,Debit (Prepaid),$494.66,Online Transaction,72655,Seattle,CA,96177,5812,60,785,
