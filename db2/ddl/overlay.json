@@ -1,0 +1,213 @@
+{
+  "_comment": [
+    "Hand-authored design decisions that a profiler cannot infer.",
+    "",
+    "The profiler reports what IS in the files. This overlay says what we WANT in Db2:",
+    "table names, column renames, keys, constraints and deliberate type overrides.",
+    "scripts/02_generate_ddl.py merges the two.",
+    "",
+    "Type overrides matter more than they look. The profiler sizes integers from the",
+    "range it observed, so against small fixtures a key column comes out SMALLINT.",
+    "Real transactions_data.csv has ~13M rows. Pinning key types here makes the DDL",
+    "independent of how much data happened to be profiled."
+  ],
+
+  "schema": "NBKI",
+
+  "watermark": {
+    "column": "LAST_UPDATED_TS",
+    "ddl": "TIMESTAMP NOT NULL GENERATED ALWAYS FOR EACH ROW ON UPDATE AS ROW CHANGE TIMESTAMP",
+    "_comment": [
+      "Engine-maintained, not application-maintained. Verified on Db2 11.5.9.0:",
+      "set on INSERT, advanced on UPDATE, untouched rows left alone.",
+      "KNOWN GAP: does not capture DELETEs. That limitation is deliberate and is",
+      "documented in docs/roadmap.md under change-capture patterns."
+    ]
+  },
+
+  "tables": [
+    {
+      "table": "CUSTOMERS",
+      "source_file": "users_data.csv",
+      "comment": "Customer master. One row per client.",
+      "primary_key": ["CUSTOMER_ID"],
+      "columns": {
+        "id":                 { "name": "CUSTOMER_ID",       "type": "INTEGER", "nullable": false },
+        "current_age":        { "name": "CURRENT_AGE" },
+        "retirement_age":     { "name": "RETIREMENT_AGE" },
+        "birth_year":         { "name": "BIRTH_YEAR" },
+        "birth_month":        { "name": "BIRTH_MONTH" },
+        "gender":             { "name": "GENDER" },
+        "address":            { "name": "ADDRESS", "type": "VARCHAR(200)" },
+        "latitude":           { "name": "LATITUDE",  "type": "DECIMAL(9,4)" },
+        "longitude":          { "name": "LONGITUDE", "type": "DECIMAL(9,4)" },
+        "per_capita_income":  { "name": "PER_CAPITA_INCOME", "type": "DECIMAL(15,2)" },
+        "yearly_income":      { "name": "YEARLY_INCOME",     "type": "DECIMAL(15,2)" },
+        "total_debt":         { "name": "TOTAL_DEBT",        "type": "DECIMAL(15,2)" },
+        "credit_score":       { "name": "CREDIT_SCORE",      "type": "SMALLINT" },
+        "num_credit_cards":   { "name": "NUM_CREDIT_CARDS",  "type": "SMALLINT" }
+      }
+    },
+
+    {
+      "table": "CARDS",
+      "source_file": "cards_data.csv",
+      "comment": "Card master. Many cards per customer.",
+      "primary_key": ["CARD_ID"],
+      "foreign_keys": [
+        { "columns": ["CUSTOMER_ID"], "references": "CUSTOMERS", "ref_columns": ["CUSTOMER_ID"] }
+      ],
+      "indexes": [
+        { "name": "IX_CARDS_CUSTOMER", "columns": ["CUSTOMER_ID"] }
+      ],
+      "columns": {
+        "id":                    { "name": "CARD_ID",     "type": "INTEGER", "nullable": false },
+        "client_id":             { "name": "CUSTOMER_ID", "type": "INTEGER", "nullable": false },
+        "card_brand":            { "name": "CARD_BRAND",  "type": "VARCHAR(32)" },
+        "card_type":             { "name": "CARD_TYPE",   "type": "VARCHAR(32)" },
+        "card_number":           { "name": "CARD_NUMBER", "type": "VARCHAR(24)",
+                                   "comment": "Synthetic. Never cast a PAN to a number.",
+                                   "override_reason": "a PAN is an identifier; BIGINT would lose leading digits and imply arithmetic is meaningful" },
+        "expires":               { "name": "EXPIRES_YM",  "type": "VARCHAR(7)",
+                                   "comment": "MM/YYYY. No day component, so DATE would invent one." },
+        "cvv":                   { "name": "CVV",         "type": "VARCHAR(8)",
+                                   "comment": "Zero-padded: 4 values in the real file begin with 0.",
+                                   "override_reason": "SMALLINT would turn '023' into 23; a CVV is an identifier, not a quantity" },
+        "has_chip":              { "name": "HAS_CHIP",    "type": "VARCHAR(8)",
+                                   "override_reason": "keep the source YES/NO wording; normalising to 0/1 belongs in silver, not bronze" },
+        "num_cards_issued":      { "name": "NUM_CARDS_ISSUED", "type": "SMALLINT" },
+        "credit_limit":          { "name": "CREDIT_LIMIT",     "type": "DECIMAL(15,2)" },
+        "acct_open_date":        { "name": "ACCT_OPEN_YM",     "type": "VARCHAR(7)" },
+        "year_pin_last_changed": { "name": "YEAR_PIN_LAST_CHANGED", "type": "SMALLINT" },
+        "card_on_dark_web":      { "name": "CARD_ON_DARK_WEB", "type": "VARCHAR(8)",
+                                   "override_reason": "same as has_chip - bronze preserves source values as-is" }
+      }
+    },
+
+    {
+      "table": "TRANSACTIONS",
+      "source_file": "transactions_data.csv",
+      "comment": "Card transaction fact. The large table; ~13M rows in the real dataset.",
+      "primary_key": ["TRANSACTION_ID"],
+      "foreign_keys": [
+        { "columns": ["CUSTOMER_ID"], "references": "CUSTOMERS", "ref_columns": ["CUSTOMER_ID"] },
+        { "columns": ["CARD_ID"],     "references": "CARDS",     "ref_columns": ["CARD_ID"] }
+      ],
+      "indexes": [
+        { "name": "IX_TXN_TS",       "columns": ["TXN_TS"],
+          "comment": "The watermark predicate hits this on every incremental run." },
+        { "name": "IX_TXN_WATERMARK","columns": ["LAST_UPDATED_TS"],
+          "comment": "Fabric filters on this. Without it, every run is a table scan." },
+        { "name": "IX_TXN_CUSTOMER", "columns": ["CUSTOMER_ID"] }
+      ],
+      "columns": {
+        "id":             { "name": "TRANSACTION_ID", "type": "BIGINT", "nullable": false },
+        "date":           { "name": "TXN_TS", "type": "TIMESTAMP", "nullable": false,
+                            "comment": "Renamed: DATE is a Db2 reserved word." },
+        "client_id":      { "name": "CUSTOMER_ID", "type": "INTEGER", "nullable": false },
+        "card_id":        { "name": "CARD_ID",     "type": "INTEGER", "nullable": false },
+        "amount":         { "name": "AMOUNT",      "type": "DECIMAL(15,2)", "nullable": false,
+                            "comment": "DECIMAL, never FLOAT. Control totals must tie exactly." },
+        "use_chip":       { "name": "USE_CHIP",       "type": "VARCHAR(32)" },
+        "merchant_id":    { "name": "MERCHANT_ID",    "type": "INTEGER" },
+        "merchant_city":  { "name": "MERCHANT_CITY",  "type": "VARCHAR(64)" },
+        "merchant_state": { "name": "MERCHANT_STATE", "type": "VARCHAR(64)",
+                            "comment": [
+                              "Not a US state code. The column mixes 2-letter US states with full",
+                              "country names; the longest observed is 'Saint Vincent and the",
+                              "Grenadines' at 32 characters. 11.75% are null.",
+                              "VARCHAR(16) truncated it. Sized to 64 for headroom."
+                            ] },
+        "zip":            { "name": "MERCHANT_ZIP",   "type": "VARCHAR(16)",
+                            "clean": "numeric_identifier",
+                            "comment": [
+                              "Arrives float-formatted as '58523.0' — the source already treated a",
+                              "postcode as a number, which is also why the leading zeros are gone",
+                              "(lowest observed is 1001, i.e. Massachusetts 01001). The '.0' is",
+                              "stripped in prepare; the lost leading zero cannot be recovered here",
+                              "and is a genuine source-data defect worth showing the customer.",
+                              "12.42% are null."
+                            ],
+                            "override_reason": "a ZIP is an identifier, not a quantity; leading zeros must survive" },
+        "mcc":            { "name": "MCC_CODE",       "type": "VARCHAR(8)", "nullable": false,
+                            "override_reason": "joins to MCC_CODES.MCC_CODE; both sides must be the same type" },
+        "errors":         { "name": "ERROR_FLAGS",    "type": "VARCHAR(128)" }
+      }
+    },
+
+    {
+      "table": "MCC_CODES",
+      "source_file": "mcc_codes.json",
+      "source_kind": "flat_map",
+      "comment": "Merchant category dimension, flattened from a JSON code->description map.",
+      "primary_key": ["MCC_CODE"],
+      "json_columns": {
+        "key":   { "name": "MCC_CODE",        "type": "VARCHAR(8)",   "nullable": false },
+        "value": { "name": "MCC_DESCRIPTION", "type": "VARCHAR(256)" }
+      }
+    },
+
+    {
+      "table": "FRAUD_LABELS",
+      "source_file": "train_fraud_labels.json",
+      "source_kind": "nested_map",
+      "nested_under": "target",
+      "comment": "Fraud labels, flattened from {'target': {txn_id: 'Yes'|'No'}}. Partial coverage by design.",
+      "primary_key": ["TRANSACTION_ID"],
+      "json_columns": {
+        "key":   { "name": "TRANSACTION_ID", "type": "BIGINT",     "nullable": false },
+        "value": { "name": "IS_FRAUD",       "type": "VARCHAR(8)", "nullable": false }
+      }
+    },
+
+    {
+      "table": "AML_TRANSACTIONS",
+      "source_file": "HI-Small_Trans.csv",
+      "optional": true,
+      "comment": [
+        "IBM AML set. A single wide table whose only job is volume.",
+        "No natural key in the source, so a generated identity column supplies one."
+      ],
+      "primary_key": ["AML_TXN_ID"],
+      "synthetic_key": {
+        "name": "AML_TXN_ID",
+        "ddl": "BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY (START WITH 1, INCREMENT BY 1)"
+      },
+      "indexes": [
+        { "name": "IX_AML_TS",        "columns": ["TXN_TS"] },
+        { "name": "IX_AML_WATERMARK", "columns": ["LAST_UPDATED_TS"] }
+      ],
+      "columns": {
+        "Timestamp":          { "name": "TXN_TS", "type": "TIMESTAMP", "nullable": false,
+                                "comment": "A real timestamp - this is what makes the watermark clean." },
+        "From Bank":          { "name": "FROM_BANK",    "type": "VARCHAR(16)", "nullable": false,
+                                "comment": "Zero-padded bank code. Text." },
+        "Account":            { "name": "ACCOUNT_FROM", "type": "VARCHAR(24)", "nullable": false },
+        "To Bank":            { "name": "TO_BANK",      "type": "VARCHAR(16)", "nullable": false },
+        "Account_dup4":       { "name": "ACCOUNT_TO",   "type": "VARCHAR(24)", "nullable": false,
+                                "comment": [
+                                  "The source header contains the name 'Account' TWICE, literally.",
+                                  "This is the second one (position 4, zero-based), which the profiler",
+                                  "disambiguates as 'Account_dup4'. It is NOT called 'Account.1' —",
+                                  "that is the pandas convention, and assuming it cost a silent",
+                                  "failure: the overlay mapped a column that does not exist, so the",
+                                  "destination account would have been dropped from the load entirely."
+                                ] },
+        "Amount Received":    { "name": "AMOUNT_RECEIVED",    "type": "DECIMAL(23,6)", "nullable": false,
+                                "comment": [
+                                  "Scale 6, not 2. 148,151 rows in HI-Small carry more than two",
+                                  "decimal places (the crypto rows go down to 0.000001), so",
+                                  "DECIMAL(19,2) would round them to 0.00 on load — no error, no",
+                                  "rejected row, just quietly missing money and control totals that",
+                                  "no longer tie."
+                                ] },
+        "Receiving Currency": { "name": "RECEIVING_CURRENCY", "type": "VARCHAR(32)" },
+        "Amount Paid":        { "name": "AMOUNT_PAID",        "type": "DECIMAL(23,6)", "nullable": false,
+                                "comment": "Same reasoning as AMOUNT_RECEIVED." },
+        "Payment Currency":   { "name": "PAYMENT_CURRENCY",   "type": "VARCHAR(32)" },
+        "Payment Format":     { "name": "PAYMENT_FORMAT",     "type": "VARCHAR(32)" },
+        "Is Laundering":      { "name": "IS_LAUNDERING",      "type": "SMALLINT" }
+      }
+    }
+  ]
+}
