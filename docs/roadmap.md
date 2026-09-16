@@ -256,12 +256,32 @@ at as the target state.
 
 - There is **no CDC support for Db2** in Fabric today.
 - There is **no native Mirroring** for Db2.
-- ~~Two Microsoft doc pages **conflict** on whether Copy job supports
-  watermark-based incremental for Db2.~~ **Resolved.** The connector capability
-  matrix settles it: Copy job for Db2 lists **"Full load"** only, with no
-  incremental option. Incremental has to be a pipeline driving the
-  `ROW CHANGE TIMESTAMP` watermark this repo already proves. Do not promise a
-  Copy job will do it.
+- Two Microsoft doc pages **conflict** on whether Copy job supports
+  watermark-based incremental for Db2. **Settled by testing, and the docs are
+  wrong.** The connector capability matrix says Copy job for Db2 is "Full load"
+  only; the product disagrees. A Copy job built in the wizard against this Db2
+  emitted:
+
+  ```json
+  "jobMode": "CDC",
+  "changeDataSettings": {
+    "readMethod": "SnapshotPlusIncremental",
+    "columns": [ { "name": "LAST_UPDATED_TS", "type": "DateTime" } ],
+    "nullWatermarkBehavior": "Skip" },
+  "writeBehavior": "Upsert",
+  "upsertSettings": { "keys": [ "CUSTOMER_ID" ] }
+  ```
+
+  So Copy job **does** offer incremental on a watermark column, and it picked up
+  the `ROW CHANGE TIMESTAMP` column this repo exists to provide. That is a much
+  better demo than a pipeline hand-wired to do the same thing.
+
+  > This entry previously said the opposite, on the strength of the capability
+  > matrix — which is exactly what the original note warned against: *"Test it in
+  > the tenant before showing it. Do not put it on a slide on the strength of the
+  > docs."* The incremental behaviour itself is still **unproven**: the first run
+  > was a snapshot. Prove it by changing a `CUSTOMERS` row and re-running before
+  > anyone demos it.
 
 ### Db2 LUW vs Db2 for i — the delta that matters to NBKI
 

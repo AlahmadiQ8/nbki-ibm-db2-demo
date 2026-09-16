@@ -403,44 +403,59 @@ has to be set in a different place than the connection dialog suggests.
 `scripts/14_create_fabricro.sh` separately grants `FABRICRO` EXECUTE on the
 `NULLID` packages, which is the server-side half of the same story.
 
-### Open question: does the pipeline Copy path speak TLS?
+### SETTLED: the Fabric Copy engine does not speak TLS to Db2
 
-Unresolved at the time of writing, and worth settling before anyone promises a
-TLS-only Db2 in a design.
-
-Observed: the **connection test** reaches Db2 over TLS fine — failed attempts
-with a wrong password appear in `db2diag.log` as
-`Password validation for user fabricro failed` from the gateway's address, which
-means the TLS handshake completed and PAM was reached. But a hand-authored
-**Copy activity** against the same connection produced, at the same moment:
+Not an open question any more, and not a mistake in hand-authored JSON — the
+**portal's own Copy job wizard fails identically**. Db2 logs, from the gateway's
+address, every time a copy is attempted against the TLS port:
 
 ```
-DIA3604E  gsk_secure_soc_init failed, return code "410"
+DIA3604E  gsk_secure_soc_init failed with return code "410"
 GSK_ERROR_BAD_MESSAGE
 An incorrectly formatted SSL message was received from the partner
 SSL socket setup failed. Client IP address: 10.20.2.4
 ```
 
-— i.e. something sent cleartext DRDA at the TLS-only port. The client reports it
-confusingly as `Have not received expected codepoint: EUSRIDNWPWD SQLCODE=-1040`,
-which looks like an authentication fault and is not one.
+Meanwhile the **connection test on the very same connection succeeds over TLS** —
+wrong-password attempts appear in `db2diag.log` as `Password validation for user
+fabricro failed`, which means the handshake completed and PAM was reached.
 
-Two candidate causes, not yet distinguished:
+So the two Fabric code paths behave differently against one connection object:
 
-1. The hand-authored pipeline JSON was wrong — likely, since the same definition
-   also got `Invalid type ''` on a later attempt.
-2. The pipeline Copy path genuinely does not negotiate TLS the way the Power
-   Query path does. Microsoft documents TLS support for the Microsoft driver as
-   arriving only with the December 2024 Power BI Desktop release, so a difference
-   between the two paths is not far-fetched.
+| Path | TLS to Db2 |
+|---|---|
+| Power Query — connection test, Navigator, Dataflow Gen2 | **yes** |
+| Copy engine — Copy job, pipeline Copy activity | **no**, sends cleartext |
 
-**Settle it by building the Copy with the portal's Copy assistant** and exporting
-the definition (`./scripts/16_fabric_pipeline.sh --export`). If the assistant's
-pipeline succeeds, cause 1 is confirmed and the exported JSON is the answer. If
-it fails the same way, cause 2 is confirmed, and the mitigation is to publish
-cleartext 50000 to the **gateway NIC only** — via the existing `asg-gateway`
-application security group, never to the internet — keeping TLS for the
-workstation path.
+The connection being marked *Encrypted* does not change this. The client reports
+it as `Have not received expected codepoint: EUSRIDNWPWD SQLCODE=-1040`, which
+reads like an authentication failure and is not one — look in `db2diag.log`
+before chasing credentials.
+
+**The mitigation, which is what this environment now runs:**
+
+```bash
+./infra/deploy.sh --lock-to-vpn --gateway-cleartext
+NBKI_DB2_CLEARTEXT_BIND=0.0.0.0 ./infra/start_db2.sh --recreate
+./scripts/14_create_fabricro.sh     # the OS user does not survive a recreate
+```
+
+Then a **second** connection on `10.20.1.4:50000` with *Use encrypted connection*
+**unticked** — the existing one cannot be repointed, because `connectionDetails`
+is not updatable. Copy jobs use the cleartext connection; the workstation and
+anything on the Power Query path keep TLS on 50001.
+
+Security position, stated plainly because a bank will ask:
+
+- Db2 is **not reachable from the internet on either port**.
+- Cleartext 50000 is allowed **only from the gateway NIC**, scoped by application
+  security group, one hop inside the VNet.
+- The operator workstation still uses **TLS on 50001**.
+- Fabric still connects as the **read-only** `FABRICRO`.
+
+The honest caveat for a production design: the gateway→Db2 hop is unencrypted
+inside the VNet, so it wants network-level protection, and it is worth raising
+with IBM whether Db2-side configuration can satisfy the Copy engine's handshake.
 
 ### What this connector can and cannot do
 

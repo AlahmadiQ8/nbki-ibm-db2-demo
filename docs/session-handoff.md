@@ -19,7 +19,7 @@ Phase 1 and Phase 2 of the roadmap are **done**. Db2 runs on Azure with the real
 account, the on-premises data gateway is registered and Online, and a Fabric
 connection is bound to it and tests green.
 
-**One task remains** — see "The one thing left" below.
+**Phase 1 is complete.** Ingestion is proven; see below.
 
 ### Proven, by running it
 
@@ -29,7 +29,8 @@ connection is bound to it and tests green.
 | `09_reconcile.sh` on the VM | **21/21** |
 | `04_load.sh` | 27,307,478 rows, **0 rejected** |
 | `15_client_test.py` over TLS as `FABRICRO` | **7/7**, six counts exact, DELETE refused `SQL0551N` |
-| Public exposure | **none** — 22 and 50001 both refuse; VPN + Bastion only |
+| Public exposure | **none** — no Db2 port reachable from the internet; VPN + Bastion only |
+| `CopyJob_1` → `lh_bronze.CUSTOMERS` | **2,000 rows**, verified from the Delta log |
 | Two full `stop.sh` → `start.sh` cycles | green each time |
 
 ---
@@ -85,68 +86,51 @@ Reopen the public path with a plain `./infra/deploy.sh`; re-lock with
 
 ---
 
-## The one thing left
+## Phase 1 is complete
 
-**Prove ingestion with a Copy activity:** `NBKI.CUSTOMERS` → `lh_bronze.customers`,
-asserting 2,000 rows. A Lookup would only prove auth and package binding; a Copy
-proves the path the demo is actually about.
+Ingestion is proven end to end. `CopyJob_1` copied `NBKI.CUSTOMERS` into
+`lh_bronze` and landed **2,000 rows** — verified from the Delta transaction log in
+OneLake (one data file, `numRecords: 2000`, 15 columns), which matches Db2
+exactly. Definition committed at `fabric/CopyJob_1.json`.
 
-**It has to be built in the portal.** Four routes to automating it were tried and
-each hit a real wall — all documented in `docs/runbook-phase1.md`:
+### Two findings from getting there, both of which change what you'd say to a customer
 
-1. Hand-authoring the pipeline JSON: three attempts, three different errors. The
-   Db2 source schema is not documented well enough to author blind.
-2. Exporting a known-good reference pipeline: the only one available sits on an
-   inactive West US 3 capacity.
-3. Creating the connection via API: on-premises credentials must be RSA-encrypted
-   with the gateway member's public key.
-4. Repointing an existing connection by script: `connectionDetails` is not
-   updatable.
+**1. The Fabric Copy engine does not speak TLS to Db2.** The Power Query path
+(connection test, Navigator, Dataflow Gen2) does; the Copy engine does not, on
+the *same connection object*, regardless of it being marked Encrypted. Confirmed
+by the portal's own wizard failing identically to hand-authored JSON, with
+`GSK_ERROR_BAD_MESSAGE` in `db2diag.log`. Full detail and the security position
+in the runbook.
 
-Do this:
+That is why there are **two** Db2 connections, and why both are needed:
 
-```
-Workspace nbki-db2-demo → New → Data pipeline → "pl_bronze_customers"
-  → Copy data assistant
-  → Source: connection nbki-db2-onprem, table NBKI.CUSTOMERS
-  → Destination: Lakehouse lh_bronze, table customers
-  → Save and Run
-```
+| Connection | Port | Encryption | Used by |
+|---|---|---|---|
+| `nbki-db2-onprem` | 50001 | Encrypted | Power Query path, connection tests |
+| `nbki-db2-onprem-copy` | 50000 | NotEncrypted | **Copy jobs** — `CopyJob_1` uses this |
 
-Then capture it into the repo so it stops living only in a workspace:
+**2. Copy job *does* support watermark-based incremental for Db2** — the
+capability matrix saying "Full load only" is wrong. The wizard produced
+`jobMode: CDC`, `readMethod: SnapshotPlusIncremental` on `LAST_UPDATED_TS`, and
+`writeBehavior: Upsert` keyed on `CUSTOMER_ID`. It found and used the
+`ROW CHANGE TIMESTAMP` column this repo exists to provide.
 
-```bash
-./scripts/16_fabric_pipeline.sh --export pl_bronze_customers
-git add fabric/pl_bronze_customers.json
-```
+**Still unproven:** the incremental *behaviour*. The first run was a snapshot.
+Change a `CUSTOMERS` row and re-run before demoing it — do not put it on a slide
+on the strength of the exported JSON alone. That is the same mistake that put the
+wrong answer in the roadmap in the first place.
 
-### The open question it settles
+## What is left
 
-A hand-authored Copy activity sent **cleartext DRDA at the TLS-only port** and
-Db2 logged `DIA3604E … GSK_ERROR_BAD_MESSAGE`. The client reported it as
-`Have not received expected codepoint: EUSRIDNWPWD SQLCODE=-1040`, which looks
-like an authentication failure and is not one.
+Nothing in Phase 1. The next work is Phase 3 in `docs/roadmap.md` — silver, gold,
+the semantic model, the report, and the data agent (which is still gated on
+customer question **G2**, cross-geo AI processing).
 
-The *connection test* reaches Db2 over TLS fine, so the gateway is capable of it.
-Two candidate causes remain, and the assistant-built pipeline distinguishes them:
+Two bits of tidying, if you care:
 
-- **It succeeds** → the hand-authored JSON was simply wrong. Commit the export.
-- **It fails the same way** → the pipeline Copy path does not negotiate TLS the
-  way the Power Query path does. Mitigation is already built and inert:
-
-  ```bash
-  ./infra/deploy.sh --lock-to-vpn --gateway-cleartext
-  NBKI_DB2_CLEARTEXT_BIND=0.0.0.0 ./infra/start_db2.sh --recreate
-  ./scripts/14_create_fabricro.sh          # OS user does not survive a recreate
-  ```
-
-  That allows cleartext 50000 **from the gateway NIC only**, inside the VNet,
-  never the internet. The workstation keeps TLS on 50001. You then recreate the
-  Fabric connection pointing at `10.20.1.4:50000`.
-
-Either way, correct the runbook to say which it was.
-
----
+- `pl_bronze_customers` is an **empty** pipeline shell (`"activities": []`) left
+  over from an abandoned attempt. Delete it so it does not mislead anyone.
+- `08_apply_delta.sh` has still never been run on Azure. It is a demo-time action.
 
 ## Things that will bite, if you forget them
 

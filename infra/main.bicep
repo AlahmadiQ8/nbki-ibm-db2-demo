@@ -476,7 +476,17 @@ resource db2Vm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
         // 4.2 + a transient 1.1 GB header-stripped .del file. Comfortable margin,
         // and no second disk to mount and get wrong.
         diskSizeGB: 128
-        managedDisk: { storageAccountType: 'Premium_LRS' }
+        // storageAccountType is deliberately NOT asserted here.
+        //
+        // A governance automation in this subscription downgrades idle OS disks
+        // from Premium_LRS to Standard_LRS while the VM is deallocated -- observed
+        // happening to both VMs during a stop/start test. ARM then refuses the next
+        // deployment outright:
+        //   OperationNotAllowed: Managed disk storage account type change through
+        //   Virtual Machine 'vm-db2' is not allowed.
+        // A template that names the SKU therefore breaks permanently the first time
+        // the environment is stopped overnight. Leaving it unset lets Azure pick a
+        // sensible default at create time and leaves the disk alone thereafter.
       }
     }
     osProfile: {
@@ -521,7 +531,7 @@ resource gatewayVm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
       osDisk: {
         createOption: 'FromImage'
         diskSizeGB: 128
-        managedDisk: { storageAccountType: 'Premium_LRS' }
+        // Not asserted -- see the note on vm-db2's OS disk.
       }
     }
     osProfile: {
