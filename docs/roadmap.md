@@ -209,8 +209,15 @@ imply otherwise.
 
 ## Phase 3 — Medallion build
 
-- [ ] **Bronze** — Copy activity, Db2 → Lakehouse Delta, one table per source
-      table, no transformation. Land it exactly as it arrives.
+**This is where the next session starts.** Phases 1 and 2 are done; see
+`docs/session-handoff.md` for live resource IDs and current state.
+
+- [x] **Bronze, proven end to end** — a Copy job lands `NBKI.CUSTOMERS` in
+      `lh_bronze` as Delta, 2,000 rows verified from the Delta log and the
+      Parquet footer. The working definition is committed at
+      `fabric/copyjob_bronze_customers.json`.
+- [ ] **Bronze, the rest** — the other five tables, same pattern, no
+      transformation. Land them exactly as they arrive.
 - [ ] **Silver** — conform types, resolve the three date formats, apply the DQ
       rules, quarantine failures rather than dropping them.
 - [ ] **Gold** — dimensional model for the semantic layer.
@@ -218,6 +225,14 @@ imply otherwise.
 - [ ] **Power BI report** — deliberately rebuild something close to what they
       have today, so the comparison is like-for-like.
 - [ ] **Fabric data agent** — needs a paid **F2+** capacity. F8 is available.
+
+> Two things to carry forward. **Build in the portal and export with
+> `scripts/16_fabric_pipeline.sh --export`** — three hand-authored pipeline
+> definitions each failed differently, and the Db2 source schema is not
+> documented well enough to write blind. And **Copy needs the cleartext
+> connection** (`nbki-db2-onprem-copy`, port 50000): the pipeline Copy path does
+> not negotiate TLS, though the Power Query path does. The cleartext hop is
+> confined by NSG to the gateway NIC alone.
 
 The delta batch (`./scripts/06_make_delta.py`) plants twelve business-rule
 violations for silver to catch. They are listed in
@@ -254,14 +269,26 @@ at as the target state.
 
 ### Fabric CDC support — verify, do not assume
 
-- There is **no CDC support for Db2** in Fabric today.
-- There is **no native Mirroring** for Db2.
+- ~~There is **no CDC support for Db2** in Fabric today.~~ **Wrong — see below.**
+  Copy job exposes a CDC mode for Db2 that watermarks on a timestamp column.
+- There is **no native Mirroring** for Db2. (Still true.)
 - ~~Two Microsoft doc pages **conflict** on whether Copy job supports
-  watermark-based incremental for Db2.~~ **Resolved.** The connector capability
-  matrix settles it: Copy job for Db2 lists **"Full load"** only, with no
-  incremental option. Incremental has to be a pipeline driving the
-  `ROW CHANGE TIMESTAMP` watermark this repo already proves. Do not promise a
-  Copy job will do it.
+  watermark-based incremental for Db2.~~ **Resolved — and the original advice to
+  "test it in the tenant" was right.** The connector capability matrix lists
+  Copy job for Db2 as *"Full load"*, and an earlier revision of this file took
+  that as settled. It is wrong. The Copy job UI offers **CDC mode** for Db2 and
+  accepts it: the job built against this environment is
+  `jobMode: CDC`, `readMethod: SnapshotPlusIncremental`, watermarking on
+  **`LAST_UPDATED_TS`** — the `ROW CHANGE TIMESTAMP` column this repo created —
+  with `writeBehavior: Upsert` keyed on `CUSTOMER_ID` and
+  `nullWatermarkBehavior: Skip`. The definition is committed at
+  `fabric/copyjob_bronze_customers.json`.
+
+  **What is proven and what is not:** the first (snapshot) run succeeded and
+  landed 2,000 rows. The *incremental* leg is **not yet proven** — that needs
+  `08_apply_delta.sh` to move the watermark, then a second run of the Copy job to
+  show it picking up the 250 inserts and 50 in-place updates. Do that before
+  putting incremental on a slide.
 
 ### Db2 LUW vs Db2 for i — the delta that matters to NBKI
 

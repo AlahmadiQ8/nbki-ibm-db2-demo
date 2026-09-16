@@ -14,12 +14,13 @@ exists right now. The other documents explain *why* things are the way they are:
 
 ## Where this got to
 
-Phase 1 and Phase 2 of the roadmap are **done**. Db2 runs on Azure with the real
-27.3M-row dataset, a SQL client reaches it over TLS as a least-privileged
-account, the on-premises data gateway is registered and Online, and a Fabric
-connection is bound to it and tests green.
+**Phase 1 and Phase 2 are complete, end to end.** Db2 runs on Azure with the real
+27.3M-row dataset, a SQL client reaches it over TLS as a least-privileged account,
+the on-premises data gateway is registered and Online, two Fabric connections are
+bound to it, and **a Copy job has successfully landed Db2 data into a Fabric
+Lakehouse**. The ingestion path the whole demo rests on is proven.
 
-**One task remains** — see "The one thing left" below.
+**Next is Phase 3** — the medallion build. See `docs/roadmap.md`.
 
 ### Proven, by running it
 
@@ -29,6 +30,9 @@ connection is bound to it and tests green.
 | `09_reconcile.sh` on the VM | **21/21** |
 | `04_load.sh` | 27,307,478 rows, **0 rejected** |
 | `15_client_test.py` over TLS as `FABRICRO` | **7/7**, six counts exact, DELETE refused `SQL0551N` |
+| VS Code Db2 extension over JDBC + TLS | connects, returns all six counts |
+| **Copy job → `lh_bronze.CUSTOMERS`** | **2,000 rows**, confirmed from the Delta log *and* the Parquet footer |
+| Copy job mode | **CDC / `SnapshotPlusIncremental`** on `LAST_UPDATED_TS` — snapshot leg proven, incremental leg not yet |
 | Public exposure | **none** — 22 and 50001 both refuse; VPN + Bastion only |
 | Two full `stop.sh` → `start.sh` cycles | green each time |
 
@@ -45,17 +49,27 @@ connection is bound to it and tests green.
 | `vgw-nbki` | P2S VPN gateway, VpnGw1AZ, OpenVPN + Entra ID. Client pool **172.16.201.0/24** |
 | `bst-nbki` | Azure Bastion, Developer SKU (free). Break-glass |
 | `vnet-nbki` | 10.20.0.0/16 — `snet-db2` .1.0/24, `snet-gateway` .2.0/24, `GatewaySubnet` .255.0/27 |
-| `asg-gateway` | ASG on the gateway NIC; the Db2 rule targets this, not the subnet CIDR |
+| `asg-gateway` | ASG on the gateway NIC; both Db2 rules target this, not the subnet CIDR |
 
 **Fabric** — workspace `nbki-db2-demo`, on the F8 capacity `momof8sweden` (Sweden Central, Active):
 
 | Item | ID |
 |---|---|
 | Workspace | `5c84bcc5-f497-4eac-b59b-5c2a36bec619` |
-| Lakehouse `lh_bronze` | `56ba34ce-c8c8-467e-a1a9-8952b7b03dba` |
+| Lakehouse `lh_bronze` | `56ba34ce-c8c8-467e-a1a9-8952b7b03dba` — contains `CUSTOMERS` (2,000 rows) |
 | SQL endpoint (same lakehouse) | `640253d8-8ea7-4683-b294-01bdd8188162` |
 | Gateway `nbki-db2-gw` | `b35258fb-ff47-4221-8749-b551885e4ce1` |
-| Connection `nbki-db2-onprem` | `f7169c24-7911-4efe-8855-cbb8f33691a7` → `10.20.1.4:50001;NBKI`, Basic, **Encrypted** |
+
+### Two Db2 connections — do not delete either
+
+`nbki-db2-onprem-copy` looks like an accidental duplicate. It is not; it is the
+only one Copy works with. Its name cannot be corrected —
+`PATCH /v1/connections/{id}` returns HTTP 200 and silently ignores `displayName`.
+
+| Connection | ID | Endpoint | Encryption | Used by |
+|---|---|---|---|---|
+| `nbki-db2-onprem` | `f7169c24-…` | `10.20.1.4:50001` | Encrypted | Connection test, Power Query, Dataflow Gen2 |
+| `nbki-db2-onprem-copy` | `d247ae2f-…` | `10.20.1.4:50000` | **NotEncrypted** | **Copy jobs / Copy activities** |
 
 **Secrets** — `~/.nbki-demo` on the operator workstation, 0700/0600. Not in Azure
 Key Vault; see "Deviations" below. `env.sh` there is what every script sources.
@@ -72,7 +86,7 @@ rule references them.
 |---|---|---|
 | VPN client `172.16.201.0/24` | `vm-db2` | 22, 50001 (TLS) |
 | VPN client | `vm-gateway` | 3389 |
-| Gateway NIC (via `asg-gateway`) | `vm-db2` | 50001 (TLS) |
+| Gateway NIC (`asg-gateway`) | `vm-db2` | 50001 (TLS) **and 50000 (cleartext)** |
 | Bastion (`VirtualNetwork`) | both | 22 / 3389 — break-glass |
 | anything else | anything | denied at priority 4000 |
 
@@ -81,70 +95,60 @@ Profile: `~/.nbki-demo/azurevpnconfig.xml` (regenerate with
 `./infra/vpn_client_profile.sh`). Without it, only Bastion works.
 
 Reopen the public path with a plain `./infra/deploy.sh`; re-lock with
-`./infra/deploy.sh --lock-to-vpn`.
+`./infra/deploy.sh --lock-to-vpn --gateway-cleartext`.
+
+> **Keep `--gateway-cleartext` on any redeploy.** Dropping it removes the
+> cleartext rule and Copy jobs stop working, with an error that blames
+> credentials rather than the network.
 
 ---
 
-## The one thing left
+## The finding that matters most
 
-**Prove ingestion with a Copy activity:** `NBKI.CUSTOMERS` → `lh_bronze.customers`,
-asserting 2,000 rows. A Lookup would only prove auth and package binding; a Copy
-proves the path the demo is actually about.
+**The pipeline Copy path does not negotiate TLS; the Power Query path does.**
 
-**It has to be built in the portal.** Four routes to automating it were tried and
-each hit a real wall — all documented in `docs/runbook-phase1.md`:
+Against the same Db2 server: the connection test, Dataflow Gen2 and the Navigator
+all complete a TLS handshake on 50001, but a Copy job sent cleartext DRDA at that
+port and Db2 rejected it with `GSK_ERROR_BAD_MESSAGE`. The client reported it as
+`EUSRIDNWPWD SQLCODE=-1040`, which reads like an authentication failure and is
+not one.
 
-1. Hand-authoring the pipeline JSON: three attempts, three different errors. The
-   Db2 source schema is not documented well enough to author blind.
-2. Exporting a known-good reference pipeline: the only one available sits on an
-   inactive West US 3 capacity.
-3. Creating the connection via API: on-premises credentials must be RSA-encrypted
-   with the gateway member's public key.
-4. Repointing an existing connection by script: `connectionDetails` is not
-   updatable.
+Hence the two connections, and hence the cleartext rule scoped to the gateway NIC
+alone — not the internet, not even the VPN subnet. Gateway → Fabric is TLS
+regardless.
 
-Do this:
+**This is worth saying out loud in the demo.** For a bank, "Db2 → gateway is
+unencrypted on the pipeline path, confined to one NIC inside a private VNet" is a
+real architectural point, and it is the argument for co-locating the gateway with
+the database in production.
 
-```
-Workspace nbki-db2-demo → New → Data pipeline → "pl_bronze_customers"
-  → Copy data assistant
-  → Source: connection nbki-db2-onprem, table NBKI.CUSTOMERS
-  → Destination: Lakehouse lh_bronze, table customers
-  → Save and Run
-```
+---
 
-Then capture it into the repo so it stops living only in a workspace:
+## Next: Phase 3, the medallion build
 
-```bash
-./scripts/16_fabric_pipeline.sh --export pl_bronze_customers
-git add fabric/pl_bronze_customers.json
-```
+`fabric/copyjob_bronze_customers.json` is the exported definition of the working
+Copy job — the reference for how a Db2 source and a Lakehouse sink are wired.
+`scripts/16_fabric_pipeline.sh` lists, exports, creates and runs pipelines.
 
-### The open question it settles
+Bear in mind when building it out:
 
-A hand-authored Copy activity sent **cleartext DRDA at the TLS-only port** and
-Db2 logged `DIA3604E … GSK_ERROR_BAD_MESSAGE`. The client reported it as
-`Have not received expected codepoint: EUSRIDNWPWD SQLCODE=-1040`, which looks
-like an authentication failure and is not one.
-
-The *connection test* reaches Db2 over TLS fine, so the gateway is capable of it.
-Two candidate causes remain, and the assistant-built pipeline distinguishes them:
-
-- **It succeeds** → the hand-authored JSON was simply wrong. Commit the export.
-- **It fails the same way** → the pipeline Copy path does not negotiate TLS the
-  way the Power Query path does. Mitigation is already built and inert:
-
-  ```bash
-  ./infra/deploy.sh --lock-to-vpn --gateway-cleartext
-  NBKI_DB2_CLEARTEXT_BIND=0.0.0.0 ./infra/start_db2.sh --recreate
-  ./scripts/14_create_fabricro.sh          # OS user does not survive a recreate
-  ```
-
-  That allows cleartext 50000 **from the gateway NIC only**, inside the VNet,
-  never the internet. The workstation keeps TLS on 50001. You then recreate the
-  Fabric connection pointing at `10.20.1.4:50000`.
-
-Either way, correct the runbook to say which it was.
+- **Authoring pipeline JSON by hand is unreliable.** Three hand-written
+  definitions each failed differently — cleartext-at-TLS-port, an
+  `InvalidCastException` because `connectionProperties` must be a dictionary, and
+  `Invalid type ''`. Build in the portal, then export.
+- **`Package collection` is not a connection setting.** It is
+  `connectionProperties` on the Copy activity source. No `-805` has been seen so
+  far, so the portal default is evidently `NULLID`.
+- **Copy job for Db2 is not full-load only** — the capability matrix says
+  "Full load", but the UI offers **CDC mode** and it works. The committed job is
+  `readMethod: SnapshotPlusIncremental` on `LAST_UPDATED_TS`, `Upsert` keyed on
+  `CUSTOMER_ID`. **The snapshot leg is proven; the incremental leg is not.**
+  Proving it is the single highest-value next experiment: run
+  `08_apply_delta.sh`, re-run the Copy job, and show it pick up 250 inserts and
+  50 in-place updates — that is the watermark story the whole demo is built on.
+- **`08_apply_delta.sh` has not been run on Azure.** It is a demo-time action —
+  applying it spends the watermark reveal and leaves the data mid-state, since
+  rollback is partial by design. To restore afterwards, re-run `04_load.sh`.
 
 ---
 
@@ -163,18 +167,15 @@ These all cost real time once already.
 - **An expired OS password produces that identical error.** The image's default
   `useradd` policy set a 90-day expiry; `14_create_fabricro.sh` now disables
   aging, but if you create accounts by hand, don't reintroduce it.
-- **`Package collection` is not a connection setting.** The Advanced section in
-  the connection dialog does not have it. It is `connectionProperties` on the
-  Copy activity source, and must be a **dictionary**.
+- **A JDBC SQL client needs the JKS truststore, not the `.arm` file.**
+  `start_db2.sh` rebuilds `~/.nbki-demo/db2-truststore.jks` (password `nbkidemo`)
+  and the import profile on every run, so they cannot drift from the certificate.
 - **Do not pin the gateway's `-RegionKey`.** Power BI can only use a gateway in
   the tenant's default region; pinning it to the capacity's region can make the
   gateway unusable.
 - **The tenant deletes NSG rules exposing 22/3389 to the internet**, even pinned
   to a `/32`. Irrelevant while locked to the VPN; it returns the moment you
   reopen the public path.
-- **`08_apply_delta.sh` has not been run on Azure.** It is a demo-time action —
-  applying it spends the watermark reveal and leaves the data mid-state, since
-  rollback is partial by design. To restore afterwards, re-run `04_load.sh`.
 
 ---
 
@@ -198,7 +199,8 @@ environment will be idle for a long stretch, and rebuild it with
 `./infra/deploy.sh` — 30–45 minutes, and the old VPN client profile will not work
 against a new gateway.
 
-`./infra/teardown.sh` removes everything, and deliberately leaves two things
-behind: `~/.nbki-demo` (including the gateway recovery key) and the gateway
-cluster registration in the Fabric tenant, which must be removed from *Manage
-connections and gateways* or it lingers as permanently offline.
+`./infra/teardown.sh` removes everything, and deliberately leaves three things
+behind: `~/.nbki-demo` (including the gateway recovery key), the gateway cluster
+registration in the Fabric tenant, and the two Db2 connections — the last two must
+be removed from *Manage connections and gateways* or they linger as permanently
+offline.

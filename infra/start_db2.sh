@@ -165,6 +165,36 @@ ssh "${SSH_OPTS[@]}" "${TARGET}" \
 chmod 0600 "${SECRET_DIR}/db2cert.arm"
 echo "    -> ${SECRET_DIR}/db2cert.arm"
 
+# ---------------------------------------------------------------------------
+# Java truststore, rebuilt from the certificate every run.
+#
+# The IBM Db2 Developer Extension for VS Code connects over JDBC and takes
+# sslTrustStorePath + sslTrustStorePassword -- it has no way to consume a raw
+# PEM/.arm file, and it refuses to connect unless BOTH are supplied for anything
+# other than a standard CA. So the .arm on its own is not enough for a SQL
+# client, even though it is what the gateway wants.
+#
+# Rebuilt rather than created-if-missing on purpose: if the keystore is ever
+# regenerated (db2_up.sh --wipe), the certificate changes and a stale truststore
+# fails with a TLS error that names neither the truststore nor the certificate.
+# ---------------------------------------------------------------------------
+TRUSTSTORE="${SECRET_DIR}/db2-truststore.jks"
+TRUSTSTORE_PW="${NBKI_TRUSTSTORE_PW:-nbkidemo}"
+if command -v keytool >/dev/null 2>&1; then
+  rm -f "${TRUSTSTORE}"
+  # JKS explicitly: JCC's sslTrustStoreType defaults to JKS, while a modern
+  # keytool would otherwise write PKCS12.
+  keytool -importcert -noprompt -alias db2cert \
+    -file "${SECRET_DIR}/db2cert.arm" \
+    -keystore "${TRUSTSTORE}" -storetype JKS \
+    -storepass "${TRUSTSTORE_PW}" >/dev/null 2>&1
+  chmod 0600 "${TRUSTSTORE}"
+  echo "    -> ${TRUSTSTORE}  (password: ${TRUSTSTORE_PW})"
+else
+  echo "    NOTE: keytool not found; skipping the JDBC truststore." >&2
+  echo "          A JDBC SQL client will need one -- see docs/runbook-phase1.md." >&2
+fi
+
 echo
 echo "==> Db2 is up with a TLS listener"
 echo "    cleartext  ${CLEARTEXT_BIND}:50000$( [[ "${CLEARTEXT_BIND}" == "127.0.0.1" ]] && echo '   (host-local only)' || echo '     (NSG: gateway NIC only)' )"

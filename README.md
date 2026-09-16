@@ -52,6 +52,14 @@ every internet-sourced inbound rule. Verified: public 22 and 50001 both refuse
 connections, while the private addresses answer over the VPN. Azure Bastion
 remains as break-glass.
 
+**The ingestion path is proven.** A Fabric Copy job reads Db2 through the
+on-premises gateway and lands `CUSTOMERS` in a Lakehouse — 2,000 rows, confirmed
+from the Delta log and the Parquet footer. One finding worth carrying into any
+design discussion: **the pipeline Copy path does not negotiate TLS**, while the
+Power Query path does, so Copy needs a cleartext connection whose reachability is
+confined by NSG to the gateway NIC alone. See
+[`docs/session-handoff.md`](docs/session-handoff.md).
+
 The on-premises data gateway is installed and running on a second VM, with the
 Db2 certificate in its trust store and connectivity to `10.20.1.4:50001` proven.
 What is left is the gateway's **cluster registration**, which Microsoft documents
@@ -371,6 +379,10 @@ code that had passed every check on the Mac. Full detail in
 | `Add-DataGatewayCluster` rejects a service principal | Documented: "must be run with a user based credential". Registration cannot be automated. Budget one RDP |
 | Gateway registers but Fabric cannot use it | `-RegionKey` was pinned. "For Power BI, it can only be used in the default tenant region." Omit it |
 | `Install-PackageProvider -Name NuGet` fails on PowerShell 7 | That is 5.1 advice; PowerShellGet 2.x already has what it needs |
+| "Copy job for Db2 is full-load only" | **Not true.** The capability matrix says Full load, but the UI offers **CDC mode** and accepts it — `SnapshotPlusIncremental` watermarking on `LAST_UPDATED_TS` with `Upsert`. Test the tenant, not the matrix |
+| Copy job fails `EUSRIDNWPWD SQLCODE=-1040`, credentials are correct | Not an auth fault. The **pipeline Copy path does not negotiate TLS** while the Power Query path does, so it sent cleartext DRDA at the TLS port and Db2 answered `GSK_ERROR_BAD_MESSAGE`. Copy needs a separate cleartext connection; the hop is confined by NSG to the gateway NIC |
+| A JDBC SQL client rejects `db2cert.arm` | The IBM Db2 VS Code extension and other JDBC clients need a **JKS truststore + password**, not a PEM. `start_db2.sh` builds `~/.nbki-demo/db2-truststore.jks` |
+| `PATCH /v1/connections/{id}` "succeeds" but nothing changes | It returns HTTP 200 and **silently ignores `displayName`** for on-premises gateway connections |
 | Fabric auth fails after a container rebuild | `FABRICRO` is an OS user in the container's `/etc/passwd`, which is an image layer, not the `/database` volume. The GRANTs survive and point at a user that no longer exists |
 
 ---
@@ -393,8 +405,8 @@ code that had passed every check on the Mac. Full detail in
 | **Azure VM, Db2 11.5.9.0 + TLS, gateway installed** | **done — `docs/runbook-phase1.md`** |
 | **Gateway registered and Online, Fabric connection bound + tested** | **done** |
 | **Db2 off the public internet — P2S VPN, everything else denied** | **done** |
-| Copy activity smoke test (`NBKI.CUSTOMERS` → `lh_bronze`) | outstanding — `docs/session-handoff.md` |
-| Medallion, semantic model, report, data agent | deferred — `docs/roadmap.md` |
+| **Copy job proven: `NBKI.CUSTOMERS` → `lh_bronze`, 2,000 rows** | **done** |
+| Medallion, semantic model, report, data agent | next — `docs/roadmap.md` |
 
 Data files are not committed: the primary dataset is ~1.4 GB and the AML set
 reaches 41 GB, and we redistribute nothing — only the scripts that fetch it.

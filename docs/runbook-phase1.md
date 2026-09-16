@@ -231,22 +231,56 @@ recovering through a browser console is a bad way to spend a morning.
 ## Connecting a SQL client
 
 Db2 presents a **self-signed** certificate with the private and public IPs as
-subject-alternative names. `~/.nbki-demo/db2cert.arm` is the PEM.
+subject-alternative names. Two artefacts matter, both in `~/.nbki-demo` and both
+refreshed by `./infra/start_db2.sh`:
 
-DBeaver, or any JDBC client using `com.ibm.db2.jcc`:
+| File | For |
+|---|---|
+| `db2cert.arm` | PEM. The gateway trust store, and CLI-driver clients (`ibm_db`) |
+| `db2-truststore.jks` | JKS, password `nbkidemo`. **JDBC clients** |
+
+### IBM Db2 Developer Extension for VS Code
+
+The extension talks **JDBC** (it ships `db2jcc4.jar` and a small Java service), and
+its connection form takes `sslTrustStorePath` + `sslTrustStorePassword`. It has no
+field for a PEM file, and it **throws unless both are supplied** whenever the
+certificate type is anything other than a standard CA. Pointing it at
+`db2cert.arm` cannot work — that is the trap.
+
+Connect the VPN first, then **Db2: Add connection**:
+
+| Field | Value |
+|---|---|
+| Connection name | `NBKI Db2 (Azure, TLS)` |
+| Host | `10.20.1.4` |
+| Port | `50001` |
+| Database | `NBKI` |
+| Username | `fabricro` |
+| Password | from `~/.nbki-demo/fabricro.pw` |
+| Enable SSL | **on** |
+| Certificate type | self-signed / custom — **not** Standard CA |
+| Truststore path | `~/.nbki-demo/db2-truststore.jks` |
+| Truststore password | `nbkidemo` |
+
+Alternatively **Db2: Manage Connections → Import**, and give it
+`~/.nbki-demo/db2-connection-profile.json`, which `start_db2.sh` keeps in step
+with the current certificate.
+
+Verified against this environment with the extension's own JCC driver (4.36.6):
+connects to `DB2/LINUXX8664 SQL110590` and returns all six counts.
+
+### Any other JDBC client (DBeaver, DataGrip, …)
 
 | Setting | Value |
 |---|---|
-| Host | `10.20.1.4` while locked to the VPN (`$NBKI_DB2_HOST`). The public IP only if you have reopened the public path |
-| Port | **50001** |
-| Database | `NBKI` |
-| Username | `fabricro` |
-| Password | `~/.nbki-demo/fabricro.pw` |
-| Driver property | `sslConnection=true` |
-| Driver property | `sslCertLocation` → path to `db2cert.arm` |
+| Driver | `com.ibm.db2.jcc.DB2Driver` |
+| URL | `jdbc:db2://10.20.1.4:50001/NBKI` |
+| Property | `sslConnection=true` |
+| Property | `sslTrustStoreLocation=<home>/.nbki-demo/db2-truststore.jks` |
+| Property | `sslTrustStorePassword=nbkidemo` |
 
 Use `fabricro`, not `db2inst1`. The instance owner can drop every table in the
-database and there is no reason to put it on the far end of a public address.
+database, and there is no reason for a SQL client to hold it.
 
 The six counts that must come back:
 
@@ -258,8 +292,6 @@ UNION ALL SELECT 'FRAUD_LABELS', COUNT(*) FROM NBKI.FRAUD_LABELS      -- 8,914,9
 UNION ALL SELECT 'AML_TRANSACTIONS', COUNT(*) FROM NBKI.AML_TRANSACTIONS -- 5,078,345
 UNION ALL SELECT 'MCC_CODES', COUNT(*) FROM NBKI.MCC_CODES;
 ```
-
----
 
 ## Registering the gateway
 
@@ -323,6 +355,22 @@ to create before wiring the connection:
 | Workspace | **`nbki-db2-demo`** — `5c84bcc5-f497-4eac-b59b-5c2a36bec619` |
 | Capacity | `momof8sweden` (F8, Sweden Central, Active) — `a47c6dd1-1dcd-4e17-9985-769c4faab20c` |
 | Lakehouse | **`lh_bronze`** — `56ba34ce-c8c8-467e-a1a9-8952b7b03dba` |
+
+### There are TWO Db2 connections, and both are needed
+
+Do not delete either. The second one looks like an accidental duplicate and is
+not — it is what makes Copy work. (Its name cannot be fixed: the
+`PATCH /v1/connections/{id}` API returns **HTTP 200 and silently ignores**
+`displayName` for on-premises gateway connections.)
+
+| Connection | Endpoint | Encryption | Used by |
+|---|---|---|---|
+| `nbki-db2-onprem` | `10.20.1.4:50001` | **Encrypted** | Connection test, Dataflow Gen2, Power Query, the Navigator |
+| `nbki-db2-onprem-copy` | `10.20.1.4:50000` | **NotEncrypted** | **Copy jobs and pipeline Copy activities** |
+
+Why the split is unavoidable: see "RESOLVED: the pipeline Copy path does not
+speak TLS" below.
+
 
 **Create this in the portal, not the API** — but not for the reason you might
 assume from a first look.
@@ -403,52 +451,63 @@ has to be set in a different place than the connection dialog suggests.
 `scripts/14_create_fabricro.sh` separately grants `FABRICRO` EXECUTE on the
 `NULLID` packages, which is the server-side half of the same story.
 
-### Open question: does the pipeline Copy path speak TLS?
+### RESOLVED: the pipeline Copy path does not speak TLS
 
-Unresolved at the time of writing, and worth settling before anyone promises a
-TLS-only Db2 in a design.
+This was an open question for a while and is now settled by evidence, because it
+changes what you can promise a customer about encryption in transit.
 
-Observed: the **connection test** reaches Db2 over TLS fine — failed attempts
-with a wrong password appear in `db2diag.log` as
-`Password validation for user fabricro failed` from the gateway's address, which
-means the TLS handshake completed and PAM was reached. But a hand-authored
-**Copy activity** against the same connection produced, at the same moment:
+**The Power Query path and the Copy path behave differently against the same Db2
+server.** The connection test, Dataflow Gen2 and the Navigator all negotiate TLS
+on 50001 happily — proven by wrong-password attempts reaching PAM and appearing
+in `db2diag.log` as `Password validation for user fabricro failed`, which is only
+possible after a completed TLS handshake.
+
+A **Copy job** against that same TLS connection failed, and Db2 logged:
 
 ```
 DIA3604E  gsk_secure_soc_init failed, return code "410"
 GSK_ERROR_BAD_MESSAGE
 An incorrectly formatted SSL message was received from the partner
-SSL socket setup failed. Client IP address: 10.20.2.4
 ```
 
-— i.e. something sent cleartext DRDA at the TLS-only port. The client reports it
-confusingly as `Have not received expected codepoint: EUSRIDNWPWD SQLCODE=-1040`,
-which looks like an authentication fault and is not one.
+— something sent cleartext DRDA at the TLS-only port. The client reports this as
+`Have not received expected codepoint: EUSRIDNWPWD SQLCODE=-1040`, which looks
+like an authentication failure and is not one. **Do not chase the credentials
+when you see that error.**
 
-Two candidate causes, not yet distinguished:
+The working Copy job uses a **second connection on cleartext 50000**
+(`connectionEncryption: NotEncrypted`), and it succeeded: 2,000 rows landed in
+`lh_bronze.CUSTOMERS`, confirmed independently from the Delta log
+(`numRecords: 2000`) and the Parquet footer.
 
-1. The hand-authored pipeline JSON was wrong — likely, since the same definition
-   also got `Invalid type ''` on a later attempt.
-2. The pipeline Copy path genuinely does not negotiate TLS the way the Power
-   Query path does. Microsoft documents TLS support for the Microsoft driver as
-   arriving only with the December 2024 Power BI Desktop release, so a difference
-   between the two paths is not far-fetched.
+**The mitigation, and why it is acceptable here.** Cleartext 50000 is published
+on the container, but the NSG rule `allow-db2-cleartext-gateway` (priority 130)
+admits it **only from the `asg-gateway` application security group** — one NIC,
+inside the VNet. It is not reachable from the internet, and not even from the VPN
+client subnet. The workstation still uses TLS on 50001. Enable it with:
 
-**Settle it by building the Copy with the portal's Copy assistant** and exporting
-the definition (`./scripts/16_fabric_pipeline.sh --export`). If the assistant's
-pipeline succeeds, cause 1 is confirmed and the exported JSON is the answer. If
-it fails the same way, cause 2 is confirmed, and the mitigation is to publish
-cleartext 50000 to the **gateway NIC only** — via the existing `asg-gateway`
-application security group, never to the internet — keeping TLS for the
-workstation path.
+```bash
+./infra/deploy.sh --lock-to-vpn --gateway-cleartext
+NBKI_DB2_CLEARTEXT_BIND=0.0.0.0 ./infra/start_db2.sh
+```
+
+**Say this out loud in the demo if encryption comes up.** For a bank it is a real
+finding, not a footnote: Db2 → gateway is unencrypted on the pipeline path, and
+the honest answer is that the hop is confined to a single NIC inside a private
+VNet. Gateway → Fabric is TLS regardless. In a production design this is the
+argument for a gateway co-located with the database.
 
 ### What this connector can and cannot do
 
 - **Read only.** Dataflow Gen2, Copy activity, Lookup and Copy job are all
   source-only. Fabric cannot write back to Db2. Do not let an architecture
   diagram imply otherwise.
-- **Copy job is full-load only** for Db2. Incremental has to be a pipeline
-  driving the `ROW CHANGE TIMESTAMP` watermark this repo already proves.
+- **Copy job is NOT full-load only for Db2**, despite what the capability matrix
+  says. The UI offers a **CDC mode**, and the job built here uses
+  `readMethod: SnapshotPlusIncremental` watermarking on `LAST_UPDATED_TS` with
+  `writeBehavior: Upsert`. The snapshot leg is proven (2,000 rows); the
+  incremental leg is not yet — run `08_apply_delta.sh`, then re-run the Copy job,
+  before claiming it.
 - **On-premises gateway always**, even though Db2 is in Azure and publicly
   addressable. A VNet data gateway is not an option for this connector.
 - **Power Query Online only uses the Microsoft driver.** The IBM .NET driver

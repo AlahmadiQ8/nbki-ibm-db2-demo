@@ -1,0 +1,77 @@
+{
+  "properties": {
+    "jobMode": "CDC",
+    "fullLoadBehavior": "Truncate",
+    "source": {
+      "type": "Db2Table",
+      "connectionSettings": {
+        "type": "Db2",
+        "externalReferences": {
+          "connection": "d247ae2f-a0c6-4c89-a8a6-82b81dcd9f25"
+        }
+      }
+    },
+    "destination": {
+      "type": "LakehouseTable",
+      "connectionSettings": {
+        "type": "Lakehouse",
+        "typeProperties": {
+          "workspaceId": "5c84bcc5-f497-4eac-b59b-5c2a36bec619",
+          "artifactId": "56ba34ce-c8c8-467e-a1a9-8952b7b03dba",
+          "rootFolder": "Tables"
+        }
+      }
+    },
+    "policy": {
+      "timeout": "0.12:00:00",
+      "retry": 0
+    }
+  },
+  "activities": [
+    {
+      "id": "a0366a87-0e10-4c44-87b4-7efdfd017a11",
+      "properties": {
+        "source": {
+          "datasetSettings": {
+            "schema": "NBKI",
+            "table": "CUSTOMERS"
+          },
+          "changeDataSettings": {
+            "readMethod": "SnapshotPlusIncremental",
+            "columns": [
+              {
+                "name": "LAST_UPDATED_TS",
+                "type": "DateTime"
+              }
+            ],
+            "nullWatermarkBehavior": "Skip"
+          }
+        },
+        "destination": {
+          "upsertSettings": {
+            "keys": [
+              "CUSTOMER_ID"
+            ]
+          },
+          "writeBehavior": "Upsert",
+          "datasetSettings": {
+            "table": "CUSTOMERS"
+          },
+          "applyVOrder": false,
+          "enableTimestampNtz": false,
+          "enableChangeDataFeed": false
+        },
+        "enableStaging": false,
+        "translator": {
+          "type": "TabularTranslator"
+        },
+        "typeConversionSettings": {
+          "typeConversion": {
+            "allowDataTruncation": true,
+            "treatBooleanAsNumber": false
+          }
+        }
+      }
+    }
+  ]
+}
