@@ -371,6 +371,8 @@ code that had passed every check on the Mac. Full detail in
 | `db2_up.sh` waits the full 900s against a database that started in four minutes | `db2_prep_stage` ran *after* the readiness loop, but the probe ships SQL in via `docker cp` **into that directory**. On a fresh container it does not exist, so every probe fails. Reproduces only on a brand-new container — the demo machine, not the developer's |
 | `rsync: unrecognized option --info=progress2` | macOS ships rsync 2.6.9; `--info` arrived in 3.1. Use `--progress` |
 | `az storage` / `az keyvault` data plane returns `AuthorizationFailure` | **Not RBAC** — the role assignment was correct. An `ASC DataProtection` policy sets `publicNetworkAccess: Disabled` on new storage accounts and vaults within a minute of creation, and disables shared-key auth. Re-enabling it is accepted and silently reverted |
+| Copy job / pipeline Copy fails, but the connection tests green | **The Fabric Copy engine does not speak TLS to Db2**, while the Power Query path does — same connection object. `db2diag.log` shows `GSK_ERROR_BAD_MESSAGE`; the client reports `EUSRIDNWPWD SQLCODE=-1040`, which looks like an auth failure and is not. Needs a second, cleartext connection reachable only from the gateway NIC |
+| Redeploy fails with `OperationNotAllowed ... storage account type` | A governance automation downgrades idle OS disks from Premium to Standard while the VM is deallocated. A template that asserts the disk SKU breaks the first time the environment is stopped overnight; do not assert it |
 | Fabric cannot reach Db2 after a VM stop/start, every setting looks correct | **`DB2COMM` reverted to `TCPIP`.** The Db2 CE image's entrypoint resets it on every container start, dropping SSL. Keystore, `SSL_SVCENAME`, `SSL_SVR_LABEL` and the published port all survive, so nothing looks wrong — but nothing listens on the TLS port. `infra/start.sh` re-asserts it |
 | SSH or RDP stops working with no config change | The tenant deletes any NSG rule exposing 22 or 3389 to the internet, even pinned to a `/32`. Use the P2S VPN, or Azure Bastion (Developer SKU is free). NSGs are stateful, so an in-flight transfer survives; only new connections are refused |
 | P2S VPN needed for a Mac, Basic SKU won't do | Basic supports only SSTP, which is Windows-only. IKEv2/OpenVPN starts at **VpnGw1AZ**. A VPN gateway also cannot be deallocated, so it bills until deleted |
@@ -405,7 +407,7 @@ code that had passed every check on the Mac. Full detail in
 | **Azure VM, Db2 11.5.9.0 + TLS, gateway installed** | **done — `docs/runbook-phase1.md`** |
 | **Gateway registered and Online, Fabric connection bound + tested** | **done** |
 | **Db2 off the public internet — P2S VPN, everything else denied** | **done** |
-| **Copy job proven: `NBKI.CUSTOMERS` → `lh_bronze`, 2,000 rows** | **done** |
+| **Ingestion proven: Copy job → `lh_bronze.CUSTOMERS`, 2,000 rows** | **done** |
 | Medallion, semantic model, report, data agent | next — `docs/roadmap.md` |
 
 Data files are not committed: the primary dataset is ~1.4 GB and the AML set

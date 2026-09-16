@@ -20,7 +20,8 @@ the on-premises data gateway is registered and Online, two Fabric connections ar
 bound to it, and **a Copy job has successfully landed Db2 data into a Fabric
 Lakehouse**. The ingestion path the whole demo rests on is proven.
 
-**Next is Phase 3** — the medallion build. See `docs/roadmap.md`.
+**Phases 1 and 2 are complete** — ingestion is proven. **Next is Phase 3**, the
+medallion build. See `docs/roadmap.md`.
 
 ### Proven, by running it
 
@@ -31,9 +32,9 @@ Lakehouse**. The ingestion path the whole demo rests on is proven.
 | `04_load.sh` | 27,307,478 rows, **0 rejected** |
 | `15_client_test.py` over TLS as `FABRICRO` | **7/7**, six counts exact, DELETE refused `SQL0551N` |
 | VS Code Db2 extension over JDBC + TLS | connects, returns all six counts |
-| **Copy job → `lh_bronze.CUSTOMERS`** | **2,000 rows**, confirmed from the Delta log *and* the Parquet footer |
-| Copy job mode | **CDC / `SnapshotPlusIncremental`** on `LAST_UPDATED_TS` — snapshot leg proven, incremental leg not yet |
-| Public exposure | **none** — 22 and 50001 both refuse; VPN + Bastion only |
+| **Copy job → `lh_bronze.CUSTOMERS`** | **2,000 rows**, verified from the Delta log *and* the Parquet footer |
+| Copy job mode | **CDC / `SnapshotPlusIncremental`** on `LAST_UPDATED_TS` — snapshot leg proven, incremental leg **not** |
+| Public exposure | **none** — no Db2 port reachable from the internet; VPN + Bastion only |
 | Two full `stop.sh` → `start.sh` cycles | green each time |
 
 ---
@@ -103,24 +104,38 @@ Reopen the public path with a plain `./infra/deploy.sh`; re-lock with
 
 ---
 
-## The finding that matters most
+## Two findings that change what you'd say to a customer
 
-**The pipeline Copy path does not negotiate TLS; the Power Query path does.**
-
-Against the same Db2 server: the connection test, Dataflow Gen2 and the Navigator
-all complete a TLS handshake on 50001, but a Copy job sent cleartext DRDA at that
-port and Db2 rejected it with `GSK_ERROR_BAD_MESSAGE`. The client reported it as
+**1. The Fabric Copy engine does not speak TLS to Db2.** The Power Query path
+(connection test, Navigator, Dataflow Gen2) does; the Copy engine does not — on
+the *same connection object*, regardless of it being marked Encrypted. Confirmed
+by the portal's own Copy wizard failing identically to hand-authored JSON, with
+`GSK_ERROR_BAD_MESSAGE` in `db2diag.log`. The client reports it as
 `EUSRIDNWPWD SQLCODE=-1040`, which reads like an authentication failure and is
-not one.
+not one — check `db2diag.log` before chasing credentials. Full detail and the
+security position are in the runbook.
 
-Hence the two connections, and hence the cleartext rule scoped to the gateway NIC
-alone — not the internet, not even the VPN subnet. Gateway → Fabric is TLS
-regardless.
+That is why there are **two** Db2 connections and why both are needed; the
+cleartext hop is scoped by NSG to the gateway NIC alone — not the internet, not
+even the VPN subnet. Gateway → Fabric is TLS regardless.
 
-**This is worth saying out loud in the demo.** For a bank, "Db2 → gateway is
-unencrypted on the pipeline path, confined to one NIC inside a private VNet" is a
-real architectural point, and it is the argument for co-locating the gateway with
-the database in production.
+**Worth saying out loud in the demo.** For a bank, "Db2 → gateway is unencrypted
+on the Copy path, confined to one NIC inside a private VNet" is a real
+architectural point, and it is the argument for co-locating the gateway with the
+database in production.
+
+**2. Copy job *does* support watermark-based incremental for Db2** — the
+capability matrix saying "Full load only" is wrong. The wizard produced
+`jobMode: CDC`, `readMethod: SnapshotPlusIncremental` on `LAST_UPDATED_TS`, and
+`writeBehavior: Upsert` keyed on `CUSTOMER_ID`. It found and used the
+`ROW CHANGE TIMESTAMP` column this repo exists to provide — a much better demo
+than a pipeline hand-wired to do the same thing.
+
+> **Still unproven: the incremental *behaviour*.** The first run was a snapshot.
+> Run `./scripts/08_apply_delta.sh` to move the watermark, then re-run the Copy
+> job and show it pick up the 250 inserts and 50 in-place updates. Do not put it
+> on a slide on the strength of the exported JSON alone — that is exactly the
+> mistake that put the wrong answer in the roadmap in the first place.
 
 ---
 
@@ -128,7 +143,8 @@ the database in production.
 
 `fabric/copyjob_bronze_customers.json` is the exported definition of the working
 Copy job — the reference for how a Db2 source and a Lakehouse sink are wired.
-`scripts/16_fabric_pipeline.sh` lists, exports, creates and runs pipelines.
+`scripts/16_fabric_pipeline.sh` lists, exports, creates and runs both
+`DataPipeline` and `CopyJob` items.
 
 Bear in mind when building it out:
 
@@ -139,13 +155,8 @@ Bear in mind when building it out:
 - **`Package collection` is not a connection setting.** It is
   `connectionProperties` on the Copy activity source. No `-805` has been seen so
   far, so the portal default is evidently `NULLID`.
-- **Copy job for Db2 is not full-load only** — the capability matrix says
-  "Full load", but the UI offers **CDC mode** and it works. The committed job is
-  `readMethod: SnapshotPlusIncremental` on `LAST_UPDATED_TS`, `Upsert` keyed on
-  `CUSTOMER_ID`. **The snapshot leg is proven; the incremental leg is not.**
-  Proving it is the single highest-value next experiment: run
-  `08_apply_delta.sh`, re-run the Copy job, and show it pick up 250 inserts and
-  50 in-place updates — that is the watermark story the whole demo is built on.
+- **Proving the incremental leg is the highest-value next experiment** — see
+  finding 2 above. It is the watermark story the whole demo is built on.
 - **`08_apply_delta.sh` has not been run on Azure.** It is a demo-time action —
   applying it spends the watermark reveal and leaves the data mid-state, since
   rollback is partial by design. To restore afterwards, re-run `04_load.sh`.

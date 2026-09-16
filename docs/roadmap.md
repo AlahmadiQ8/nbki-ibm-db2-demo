@@ -269,26 +269,38 @@ at as the target state.
 
 ### Fabric CDC support — verify, do not assume
 
-- ~~There is **no CDC support for Db2** in Fabric today.~~ **Wrong — see below.**
-  Copy job exposes a CDC mode for Db2 that watermarks on a timestamp column.
+- ~~There is **no CDC support for Db2** in Fabric today.~~ **Contradicted by the
+  entry below** — Copy job exposes a CDC mode for Db2 that watermarks on a
+  timestamp column.
 - There is **no native Mirroring** for Db2. (Still true.)
-- ~~Two Microsoft doc pages **conflict** on whether Copy job supports
-  watermark-based incremental for Db2.~~ **Resolved — and the original advice to
-  "test it in the tenant" was right.** The connector capability matrix lists
-  Copy job for Db2 as *"Full load"*, and an earlier revision of this file took
-  that as settled. It is wrong. The Copy job UI offers **CDC mode** for Db2 and
-  accepts it: the job built against this environment is
-  `jobMode: CDC`, `readMethod: SnapshotPlusIncremental`, watermarking on
-  **`LAST_UPDATED_TS`** — the `ROW CHANGE TIMESTAMP` column this repo created —
-  with `writeBehavior: Upsert` keyed on `CUSTOMER_ID` and
-  `nullWatermarkBehavior: Skip`. The definition is committed at
-  `fabric/copyjob_bronze_customers.json`.
+- Two Microsoft doc pages **conflict** on whether Copy job supports
+  watermark-based incremental for Db2. **Settled by testing, and the docs are
+  wrong.** The connector capability matrix says Copy job for Db2 is "Full load"
+  only; the product disagrees. A Copy job built in the wizard against this Db2
+  emitted:
 
-  **What is proven and what is not:** the first (snapshot) run succeeded and
-  landed 2,000 rows. The *incremental* leg is **not yet proven** — that needs
-  `08_apply_delta.sh` to move the watermark, then a second run of the Copy job to
-  show it picking up the 250 inserts and 50 in-place updates. Do that before
-  putting incremental on a slide.
+  ```json
+  "jobMode": "CDC",
+  "changeDataSettings": {
+    "readMethod": "SnapshotPlusIncremental",
+    "columns": [ { "name": "LAST_UPDATED_TS", "type": "DateTime" } ],
+    "nullWatermarkBehavior": "Skip" },
+  "writeBehavior": "Upsert",
+  "upsertSettings": { "keys": [ "CUSTOMER_ID" ] }
+  ```
+
+  So Copy job **does** offer incremental on a watermark column, and it picked up
+  the `ROW CHANGE TIMESTAMP` column this repo exists to provide. That is a much
+  better demo than a pipeline hand-wired to do the same thing. The definition is
+  committed at `fabric/copyjob_bronze_customers.json`.
+
+  > This entry previously said the opposite, on the strength of the capability
+  > matrix — which is exactly what the original note warned against: *"Test it in
+  > the tenant before showing it. Do not put it on a slide on the strength of the
+  > docs."* The incremental behaviour itself is still **unproven**: the first run
+  > was a snapshot. Prove it with `./scripts/08_apply_delta.sh` to move the
+  > watermark, then re-run the Copy job and show it pick up the 250 inserts and
+  > 50 in-place updates — before anyone demos it.
 
 ### Db2 LUW vs Db2 for i — the delta that matters to NBKI
 

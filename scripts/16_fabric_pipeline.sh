@@ -20,6 +20,11 @@
 # worth guessing at, and a wrong guess produces a pipeline that is accepted by
 # the API and fails at runtime. Let the portal emit it, then keep what it emits.
 #
+# Handles both item types that can carry a Copy: DataPipeline and CopyJob. The
+# Copy job wizard is the quicker way to build one and produces a CopyJob item,
+# not a pipeline -- so a tool that only knew about pipelines would report "not
+# found" for something plainly visible in the workspace.
+#
 # Usage:
 #   ./scripts/16_fabric_pipeline.sh --list
 #   ./scripts/16_fabric_pipeline.sh --export "pl_bronze_customers"
@@ -46,12 +51,13 @@ token() {
 # the API is broken rather than like a typo.
 pipeline_id() {
   local name="$1" id
-  id="$(curl -fsS -H "Authorization: Bearer $(token)" "${API}/workspaces/${WS}/items?type=DataPipeline" \
+  id="$(curl -fsS -H "Authorization: Bearer $(token)" "${API}/workspaces/${WS}/items" \
         | python3 -c "
 import json,sys
 name=sys.argv[1]
 for i in json.load(sys.stdin).get('value',[]):
-    if i.get('displayName')==name: print(i['id']); break
+    if i.get('displayName')==name and i.get('type') in ('DataPipeline','CopyJob'):
+        print(i['id']); break
 " "${name}")"
   if [[ -z "${id}" ]]; then
     echo "ERROR: no DataPipeline named '${name}' in workspace ${WS}." >&2
@@ -63,12 +69,12 @@ for i in json.load(sys.stdin).get('value',[]):
 
 case "${1:-}" in
   --list)
-    curl -fsS -H "Authorization: Bearer $(token)" "${API}/workspaces/${WS}/items?type=DataPipeline" \
+    curl -fsS -H "Authorization: Bearer $(token)" "${API}/workspaces/${WS}/items" \
       | python3 -c "
 import json,sys
-v=json.load(sys.stdin).get('value',[])
-print(f'{len(v)} pipeline(s) in the workspace')
-for i in v: print(' ', i['displayName'], i['id'])
+v=[i for i in json.load(sys.stdin).get('value',[]) if i.get('type') in ('DataPipeline','CopyJob')]
+print(f'{len(v)} copy item(s) in the workspace')
+for i in v: print(f\"  {i['type']:<13} {i['displayName']:<28} {i['id']}\")
 "
     ;;
 
@@ -83,9 +89,10 @@ for i in v: print(' ', i['displayName'], i['id'])
 import base64, json, pathlib, sys
 d=json.load(sys.stdin)
 parts=d.get('definition',{}).get('parts',[])
-part=next((p for p in parts if p['path'].endswith('pipeline-content.json')), None)
+# DataPipeline emits pipeline-content.json; CopyJob emits copyjob-content.json.
+part=next((p for p in parts if p['path'].endswith(('pipeline-content.json','copyjob-content.json'))), None)
 if not part:
-    sys.exit('no pipeline-content.json in the definition; parts were: %s' % [p['path'] for p in parts])
+    sys.exit('no content part in the definition; parts were: %s' % [p['path'] for p in parts])
 content=json.loads(base64.b64decode(part['payload']))
 out=pathlib.Path(sys.argv[1])
 out.write_text(json.dumps(content, indent=2) + '\n')
@@ -119,8 +126,13 @@ print(json.dumps({
     id="$(pipeline_id "${name}")"
     echo "==> Triggering ${name}"
     # The job instance URI comes back in the Location header, not the body.
+    # CopyJob runs under a different jobType than a pipeline.
+    itype="$(curl -fsS -H "Authorization: Bearer $(token)" "${API}/workspaces/${WS}/items/${id}" \
+             | python3 -c "import json,sys; print(json.load(sys.stdin).get('type',''))")"
+    jobtype="Pipeline"; [[ "${itype}" == "CopyJob" ]] && jobtype="CopyJob"
+    echo "    item type: ${itype}, jobType: ${jobtype}"
     loc="$(curl -fsS -D - -o /dev/null -X POST -H "Authorization: Bearer $(token)" -H "Content-Length: 0" \
-            "${API}/workspaces/${WS}/items/${id}/jobs/instances?jobType=Pipeline" \
+            "${API}/workspaces/${WS}/items/${id}/jobs/instances?jobType=${jobtype}" \
           | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')"
     if [[ -z "${loc}" ]]; then
       echo "ERROR: no Location header returned; the run may not have started." >&2
