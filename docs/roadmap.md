@@ -12,16 +12,75 @@ not lose a day to something this one already found.
 
 ## Phase 1 — Stand up Db2 somewhere Fabric can reach it
 
+**Done.** See `docs/runbook-phase1.md` for how to operate what was built, and
+`infra/` for the Bicep and the lifecycle scripts.
+
 Local validation used a Docker container on a Mac. That was the right call for
 proving the data pipeline, but Fabric cannot reach `localhost`.
 
-- [ ] Provision an Azure VM. **Standard_D4s_v5 (4 vCPU / 16 GiB)** matches the
+- [x] Provision an Azure VM. **Standard_D4s_v5 (4 vCPU / 16 GiB)** matches the
       Db2 Community Edition entitlement, so a larger VM buys nothing.
-- [ ] Install Db2 **11.5.9.0**. Do not take the latest. See "Version pinning".
-- [ ] Run `./scripts/04_load.sh` with `DB2_MODE=local`. The script was written
-      to work in both modes for exactly this reason.
-- [ ] Open port 50000 to the gateway subnet only. Not to the internet.
-- [ ] `./scripts/05_verify.sh` must pass 23/23 on the VM before anything else.
+- [x] Install Db2 **11.5.9.0**. Do not take the latest. See "Version pinning".
+      Done as the `icr.io/db2_community/db2:11.5.9.0` container on Ubuntu 22.04,
+      x86_64 — the `DB2_MODE=docker` path this repo already proves, without the
+      Rosetta emulation that made local start-up slow.
+- [x] Open port 50000 to the gateway subnet only. Not to the internet.
+      **Done better than specified:** cleartext 50000 is published on the host's
+      loopback only and is not reachable from anywhere. A TLS listener on 50001
+      is the only exposed port, scoped by NSG to the operator's `/32` and to the
+      gateway NIC via an application security group.
+- [x] `./scripts/05_verify.sh` must pass 23/23 on the VM before anything else.
+
+### What running it on a real VM actually broke
+
+Three of these were latent bugs in code that had passed every check on the Mac.
+All are fixed; they are recorded because each one presents as something else.
+
+| Symptom | Cause |
+|---|---|
+| `db2_up.sh` dies with "unexpected container state" | Docker 29 prints an **empty line to stdout** *and* exits non-zero when inspecting a missing container, so `docker inspect ... \|\| echo absent` yields `"\nabsent"`. Older Docker printed nothing, which hid it |
+| `db2_up.sh` waits the full 900s against a database that came up in four minutes | `db2_prep_stage` ran *after* the readiness loop, but the readiness probe ships its SQL in with `docker cp` into that very directory. On a genuinely fresh container it does not exist, so every probe fails. Only ever reproduces on a brand-new container — the demo machine, not the developer's |
+| `rsync: unrecognized option --info=progress2` | macOS ships rsync 2.6.9; `--info` arrived in 3.1. Same family as the BSD/GNU `seq` divergence already recorded in the README |
+| TLS listener silently gone after a deallocate/start, with every setting still correct | The Db2 CE image's entrypoint sets **`DB2COMM=TCPIP`** on every container start, dropping SSL. The keystore, `SSL_SVCENAME` and `SSL_SVR_LABEL` persist on the `/database` volume and the port stays published, so the configuration looks untouched while nothing listens on 50001. Only reproduces on a restart — i.e. on the morning of the demo, not during the build |
+
+### The subscription fought back
+
+This tenant is governed, and two controls changed the design rather than merely
+inconveniencing it. Both are worth knowing before planning any Azure work here.
+
+**Storage and Key Vault are forced private.** An `ASC DataProtection` policy
+assignment sets `publicNetworkAccess: Disabled` on every new storage account and
+key vault within about a minute of creation, and sets
+`allowSharedKeyAccess: false`. An attempt to re-enable public access is accepted
+and silently reverted. The failure surfaces as `AuthorizationFailure` on the data
+plane, which reads exactly like a missing RBAC role and is not — the role
+assignment was correct throughout. Consequences: the planned Blob staging hop for
+the 1.7 GB of CSVs is impossible from a workstation, so data goes straight to the
+VM over `rsync`; and secrets live in `~/.nbki-demo` at 0600 rather than in Key
+Vault. Key Vault behind a private endpoint is the right production answer.
+
+**Internet-facing management ports are deleted automatically.** An automated
+control removes any NSG rule exposing 22 or 3389 to the internet, even pinned to
+a single `/32`. Both rules vanished within about 45 minutes of the first
+deployment; the Db2 TLS rule on 50001 was left alone. Two answers, and the second
+is the real one:
+
+- **Azure Bastion, Developer SKU** — free, no subnet, no public IP — for anything
+  interactive. Its Developer SKU cannot carry native-client tunnelling, so a bulk
+  `rsync` still needs a real SSH rule, which must be expected to disappear.
+- **A point-to-site VPN gateway.** With the workstation holding an address inside
+  the VNet, no internet-sourced inbound rule is needed at all, so Db2 comes off
+  the public internet entirely and both problems disappear at the root. The Basic
+  SKU cannot do it — SSTP only, which is Windows-only — so the floor for a Mac is
+  **VpnGw1AZ** at roughly $153/month, and a VPN gateway **cannot be deallocated**.
+  Entra ID authentication needs no app registration and no admin consent when you
+  use the Microsoft-registered client app ID
+  `c632b3df-fb67-4d84-bdcf-b95ad541b5c8`; the guidance telling you otherwise
+  applies to the older, manually-registered audience values.
+
+NSGs are stateful, so an in-flight transfer survives a rule's removal; only new
+connections are refused.
+
 
 ### Version pinning — why 11.5.9.0
 
@@ -41,10 +100,81 @@ The Fabric Db2 connector **always requires an on-premises data gateway** — eve
 when Db2 is in Azure, even when it is publicly addressable. There is no
 gateway-free path. Budget for it as a real work item, not a checkbox.
 
-- [ ] Gateway VM in the same VNet (or peered).
-- [ ] Install the on-premises data gateway (standard mode, not personal).
-- [ ] Register it to the Fabric tenant.
+Confirmed against the connector matrix: Dataflow Gen2, Copy activity, Lookup and
+Copy job are *all* source-only and *all* say **On-premises**. A VNet data gateway
+cannot be used. `docs/feasibility.md` drew one; that was wrong and has been
+corrected.
+
+- [x] Gateway VM in the same VNet (or peered).
+- [x] Install the on-premises data gateway (standard mode, not personal).
+- [ ] Register it to the Fabric tenant. **Requires one interactive sign-in** —
+      see "Registration cannot be automated".
 - [ ] Create the Db2 connection in Fabric and bind it to the gateway.
+
+### Registration cannot be automated, and the install nearly cannot either
+
+The obvious automation path looks viable and is not. Two separate walls:
+
+1. **`Add-DataGatewayCluster` is documented "This command must be run with a user
+   based credential."** `Connect-DataGatewayServiceAccount` happily accepts
+   `-ApplicationId`/`-ClientSecret`, which makes the whole thing look
+   automatable, but the cmdlet that actually creates the cluster rejects that
+   identity. No Entra app registration, managed identity or SYSTEM context gets
+   past it. Budget one RDP session.
+
+2. **`Install-DataGateway -AcceptConditions` is not an unattended install
+   either.** It fails with *"Login first with Login-DataGatewayServiceAccount"* —
+   the cmdlet needs an authenticated session merely to fetch and run the
+   installer. The way round it is to skip the module and run the vendor installer
+   directly:
+
+   ```powershell
+   Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/?LinkId=2116849' -OutFile $exe
+   Start-Process $exe -ArgumentList '-q','-norestart','ACCEPTEULA=yes' -Wait
+   ```
+
+   That *is* genuinely silent, and `scripts/12_gateway_install.ps1` uses it. The
+   whole install, including PowerShell 7 and the `DataGateway` module, now runs
+   unattended through `az vm run-command`.
+
+   Related: `Install-PackageProvider -Name NuGet` is Windows PowerShell 5.1
+   advice and fails under PowerShell 7 with *"No match was found for the
+   specified search criteria for the provider 'NuGet'"*. PowerShellGet 2.x
+   already has what it needs.
+
+### Do not pin the gateway's region
+
+The instinct is to set `-RegionKey` to wherever the Fabric capacity lives. Do
+not. Microsoft documents: *"changing the gateway region will restrict the regions
+in which you can use the gateway. For Power BI, it can only be used in the
+default tenant region."* Pinning it to match the capacity can make the gateway
+**unusable** rather than faster.
+
+Omit `-RegionKey` and the tenant default is used, which is correct. Note also
+that `Get-DataGatewayRegion` is tenant-specific and must be run *after*
+`Connect-DataGatewayServiceAccount`, not before.
+
+### TLS and least privilege are not optional here
+
+`docs/feasibility.md` specified TLS and a dedicated read-only account. Because
+this build keeps a publicly reachable Db2 port for SQL-client convenience, those
+two stopped being nice-to-have:
+
+- Db2 listens for TLS on **50001** with a self-signed certificate carrying both
+  the private and public IPs as SANs. Cleartext 50000 is bound to the container
+  host's loopback and is never published.
+- Fabric connects as **`FABRICRO`** (`CONNECT` + `SELECTIN` on schema `NBKI`,
+  plus `EXECUTE` on the `NULLID` packages), never as the instance owner.
+- The self-signed certificate must be imported into `LocalMachine\Root` on the
+  gateway VM, or "Use Encrypted Connection" fails validation with a transport
+  error that never mentions certificates.
+
+**`FABRICRO` does not survive a container rebuild.** It is an OS user in the
+container's `/etc/passwd`, which is an image layer, not the `/database` volume.
+`db2_up.sh --recreate` silently removes it while leaving the GRANTs pointing at a
+user that no longer exists, and Fabric starts failing authentication for no
+visible reason. `infra/start.sh` checks for this.
+
 
 ### The `-805` package trap
 
@@ -126,9 +256,12 @@ at as the target state.
 
 - There is **no CDC support for Db2** in Fabric today.
 - There is **no native Mirroring** for Db2.
-- Two Microsoft doc pages **conflict** on whether Copy job supports
-  watermark-based incremental for Db2. **Test it in the tenant** before showing
-  it. Do not put it on a slide on the strength of the docs.
+- ~~Two Microsoft doc pages **conflict** on whether Copy job supports
+  watermark-based incremental for Db2.~~ **Resolved.** The connector capability
+  matrix settles it: Copy job for Db2 lists **"Full load"** only, with no
+  incremental option. Incremental has to be a pipeline driving the
+  `ROW CHANGE TIMESTAMP` watermark this repo already proves. Do not promise a
+  Copy job will do it.
 
 ### Db2 LUW vs Db2 for i — the delta that matters to NBKI
 
@@ -203,14 +336,13 @@ The demo should be materially different for each:
 
 ## Still outstanding in this repo
 
-- [ ] **Download the real Kaggle data.** Everything so far is proven against
-      generated fixtures — see the README. Needs `~/.kaggle/kaggle.json`.
-- [ ] Re-run `00_download.sh` → `01_profile.py` → `02_generate_ddl.py` and
-      **expect the profiler to report differences** from the fixture
-      assumptions. That is what it is for.
-- [ ] Regenerate the CSV drop and the delta from real data, and re-reconcile.
-- [ ] Decide the final demo volume. `HI-Small` for AML; **never `Large`** — Db2
-      Community Edition is 4 cores and 16 GB.
+Everything in the original list here is **done** and was left stale for a while,
+which is its own lesson: the real Kaggle data was downloaded, profiled (four
+assumptions corrected), the DDL regenerated, and the CSV drop and delta rebuilt
+and reconciled against real data. `HI-Small` was chosen for AML. See the README.
+
+What is actually left is in `docs/session-handoff.md`, which is the current-state
+snapshot — live resource IDs, network posture, and the single remaining task.
 
 ---
 

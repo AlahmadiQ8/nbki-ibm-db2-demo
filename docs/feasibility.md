@@ -36,7 +36,7 @@ with it.
 
 | Gate | Status |
 |---|---|
-| **G1** Fabric capacity | ✅ **Paid F8+** — clears both the VNet data gateway and the data agent (needs paid F2+) |
+| **G1** Fabric capacity | ✅ **Paid F8+** — clears the data agent (needs paid F2+). Note the Db2 connector requires an *on-premises* gateway regardless of capacity |
 | **G2** Cross-geo AI processing acceptable to NBKI compliance? | ⏳ Open. Gates the **data agent only**. If no, cut it from the live demo — don't discover this mid-presentation. |
 | **G3** Audience — IBM i/infra engineers or data/BI/business? | ⏳ Open. Determines how deep to go on connectivity vs. the value story. |
 
@@ -76,7 +76,7 @@ flowchart LR
   subgraph AZ["Azure VNet — UK South (no public IP, NSG-restricted)"]
     DB2["IBM Db2 Community Edition 11.5.9<br/>Linux VM · TLS · read-only svc account"]
     CSV["CSV drop<br/>(mimics today's manual extract)"]
-    GW["VNet data gateway<br/>(managed)"]
+    GW["On-premises data gateway<br/>(Windows VM — the only option<br/>for the Db2 connector)"]
   end
   subgraph FAB["Microsoft Fabric (F8+)"]
     B["🥉 Bronze — raw<br/>+ load_id, extract window, row counts"]
@@ -112,13 +112,18 @@ The connector **requires a gateway regardless** — Microsoft is explicit: *"You
 on-premises data gateway for this connector, whether the IBM Db2 database is on your local network or
 online."*
 
-**Use the VNet data gateway** (managed, no VM, supports pipelines, Copy job, Dataflow Gen2 and
-semantic models; F8+ confirmed). State clearly that this is a **demo convenience** — NBKI's production
-pattern would be an on-prem gateway cluster near the approved source. OPDG on a Windows VM is the
-fallback if anything misbehaves.
+**Use an on-premises data gateway on a Windows VM.** There is no alternative: the
+capability matrix marks Dataflow Gen2, Copy activity, Lookup *and* Copy job as
+**On-premises**, so a VNet data gateway cannot serve this connector at all.
 
-> Networking is friendly: OPDG needs **no inbound ports**. Keep Db2 and the gateway in the same VNet so
-> port 50000 never leaves the subnet.
+> An earlier revision of this document recommended the VNet data gateway as a
+> "demo convenience", which directly contradicted the quotation immediately
+> above it. That was wrong and is corrected here — the gateway VM is a real work
+> item, not a checkbox. See `docs/roadmap.md`, Phase 2.
+
+> Networking is friendly: the gateway needs **no inbound ports** from the
+> internet. Keep Db2 and the gateway in the same VNet so the database port never
+> leaves it.
 
 ### 3.3 Pre-empt the `-805` package trap
 
@@ -309,7 +314,7 @@ correction → rerun to prove idempotency → one governed report → "here's wh
 
 ### P0 spike — before anything else
 
-Db2 CE on the VM → VNet data gateway → one Fabric pipeline reads one Db2 table **over TLS, as the
+Db2 CE on the VM → on-premises data gateway → one Fabric pipeline reads one Db2 table **over TLS, as the
 least-privileged account, with a correct incremental second run.** Not merely "a table can be read."
 Nothing else starts until this passes.
 

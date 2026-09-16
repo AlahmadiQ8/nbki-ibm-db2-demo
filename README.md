@@ -5,11 +5,19 @@ medallion architecture, built for **NBK International**, who run **Finastra
 Equation** core banking and today extract to CSV by hand to build Power BI
 reports.
 
-This repository is **one part of that demo**: the data that seeds Db2, and a
-CSV drop-in fallback for when the live path fails. The Fabric build itself is
-deliberately out of scope — see [`docs/roadmap.md`](docs/roadmap.md).
+This repository holds the data that seeds Db2, a CSV drop-in fallback for when
+the live path fails, and the infrastructure that stands the whole thing up on
+Azure: the Db2 VM, the on-premises data gateway, and the network that connects
+them to Fabric. The medallion build itself — bronze/silver/gold, the semantic
+model, the report — is still deliberately out of scope; see
+[`docs/roadmap.md`](docs/roadmap.md).
 
 ---
+
+> **Picking this up in a new session?** Start with
+> [`docs/session-handoff.md`](docs/session-handoff.md) — it is the current-state
+> snapshot: live resource IDs, the network posture (everything is locked to a
+> VPN), the single remaining task, and the traps that have already cost time.
 
 ## Read this first
 
@@ -28,6 +36,30 @@ tying exactly.
 
 Timings on an arm64 Mac with Db2 under Rosetta: download ~6 min, profile ~70
 min, prepare 4m20s, load ~9 min.
+
+### It now also runs on Azure
+
+The same 27.3 million rows are loaded into **Db2 11.5.9.0 on an Azure VM**
+(Sweden Central, Standard_D4s_v5, x86_64), verified **23/23** with control totals
+tying exactly, and the CSV fallback reconciles **21/21** against it. A SQL client
+on the workstation reaches it **over TLS on port 50001**, as a least-privileged
+`FABRICRO` account, and returns all six counts exactly — `scripts/15_client_test.py`
+asserts that rather than asking you to eyeball it.
+
+**Db2 is not on the public internet.** A point-to-site VPN gateway puts the
+workstation inside the VNet, and `./infra/deploy.sh --lock-to-vpn` then removes
+every internet-sourced inbound rule. Verified: public 22 and 50001 both refuse
+connections, while the private addresses answer over the VPN. Azure Bastion
+remains as break-glass.
+
+The on-premises data gateway is installed and running on a second VM, with the
+Db2 certificate in its trust store and connectivity to `10.20.1.4:50001` proven.
+What is left is the gateway's **cluster registration**, which Microsoft documents
+as impossible to automate — it needs one interactive sign-in. See
+[`docs/runbook-phase1.md`](docs/runbook-phase1.md).
+
+Cleartext Db2 is not exposed anywhere: port 50000 is bound to the container
+host's loopback, and only the TLS listener is reachable.
 
 ### What profiling the real data changed
 
@@ -93,6 +125,11 @@ scripts/
   07_make_csv_drop.py    generate the messy CSV fallback
   08_apply_delta.sh      apply the delta and show the watermark move
   09_reconcile.sh        prove file -> manifest -> Db2 all agree  (21 checks)
+  11_sync_to_vm.sh       push the repo and the prepared data to the Azure VM
+  12_gateway_install.ps1 install the on-premises data gateway, unattended
+  13_gateway_register.ps1  register the cluster  (the one interactive step)
+  14_create_fabricro.sh  create the read-only principal Fabric connects as
+  15_client_test.py      connect from your workstation over TLS and assert every count
   csv_check.py           parse the messy extracts and report what they REALLY hold
   _db2_lib.sh            shared Db2 transport  (read the comments before editing)
   dev_make_fixtures.py   synthetic stand-ins, with the quirks of the real thing
@@ -103,10 +140,24 @@ db2/
   delta/                 GENERATED delta batch + its expected results
 
 csv-drop/                the fallback, and the "before" picture.  See its README
+infra/
+  main.bicep             the Azure footprint: VNet, NSGs, two VMs, Bastion, P2S VPN
+  deploy.sh              provision, and generate secrets into ~/.nbki-demo
+                         (--lock-to-vpn drops every internet-sourced inbound rule)
+  vpn_client_profile.sh  fetch the Azure VPN Client profile for this Mac
+  _ensure_ssh_access.sh  re-assert the SSH rule the tenant keeps deleting
+  bootstrap_db2.sh       Docker + operator account on the Db2 VM
+  start_db2.sh           start the container and configure the TLS listener
+  trust_cert_on_gateway.sh   make the gateway trust the Db2 certificate
+  start.sh / stop.sh     deallocate and bring back up  (start.sh also restarts Db2)
+  teardown.sh            delete the resource group
 docs/
+  session-handoff.md     CURRENT STATE — read this first in a new session
   feasibility.md         the original feasibility analysis
   dataset-selection.md   which datasets, why, licences, and what was rejected
+  runbook-phase1.md      how to operate the Azure environment
   roadmap.md             everything deferred to follow-up sessions
+fabric/                  exported Fabric pipeline definitions
 ```
 
 ## Running it
@@ -141,6 +192,11 @@ overlay and regenerate.
 No third-party Python packages are required. The profiler and the prepare step
 are stdlib-only, on purpose: a missing wheel on a very new Python must not be
 what stops a customer demo.
+
+The one exception is `scripts/15_client_test.py`, which needs `ibm_db` to open a
+real DRDA connection to the Azure VM. That is a client-side acceptance test
+rather than part of the seed pipeline, so it cannot break the demo by failing to
+install — and it is the only honest way to prove the wire end to end.
 
 ---
 
@@ -295,6 +351,28 @@ And one from the same family, in a different tool:
 |---|---|
 | Kaggle download fails *after* the credential check passed | The Kaggle CLI **exits 0 even when authentication fails**. Worse, most read endpoints work anonymously, and `datasets list --mine` returns "No datasets found" on a rejected token — indistinguishable from an empty account. `00_download.sh` probes `competitions list` and reads its **output**, not its exit code |
 
+## Azure and gateway sharp edges
+
+Found while standing the demo up on a real VM. Three of these were latent bugs in
+code that had passed every check on the Mac. Full detail in
+[`docs/runbook-phase1.md`](docs/runbook-phase1.md).
+
+| Symptom | Cause |
+|---|---|
+| `db2_up.sh`: "unexpected container state" | Docker 29 prints an **empty line to stdout** *and* exits non-zero for a missing container, so `docker inspect … \|\| echo absent` yields `"\nabsent"`. Older Docker printed nothing, hiding it |
+| `db2_up.sh` waits the full 900s against a database that started in four minutes | `db2_prep_stage` ran *after* the readiness loop, but the probe ships SQL in via `docker cp` **into that directory**. On a fresh container it does not exist, so every probe fails. Reproduces only on a brand-new container — the demo machine, not the developer's |
+| `rsync: unrecognized option --info=progress2` | macOS ships rsync 2.6.9; `--info` arrived in 3.1. Use `--progress` |
+| `az storage` / `az keyvault` data plane returns `AuthorizationFailure` | **Not RBAC** — the role assignment was correct. An `ASC DataProtection` policy sets `publicNetworkAccess: Disabled` on new storage accounts and vaults within a minute of creation, and disables shared-key auth. Re-enabling it is accepted and silently reverted |
+| Fabric cannot reach Db2 after a VM stop/start, every setting looks correct | **`DB2COMM` reverted to `TCPIP`.** The Db2 CE image's entrypoint resets it on every container start, dropping SSL. Keystore, `SSL_SVCENAME`, `SSL_SVR_LABEL` and the published port all survive, so nothing looks wrong — but nothing listens on the TLS port. `infra/start.sh` re-asserts it |
+| SSH or RDP stops working with no config change | The tenant deletes any NSG rule exposing 22 or 3389 to the internet, even pinned to a `/32`. Use the P2S VPN, or Azure Bastion (Developer SKU is free). NSGs are stateful, so an in-flight transfer survives; only new connections are refused |
+| P2S VPN needed for a Mac, Basic SKU won't do | Basic supports only SSTP, which is Windows-only. IKEv2/OpenVPN starts at **VpnGw1AZ**. A VPN gateway also cannot be deallocated, so it bills until deleted |
+| Entra-auth VPN docs tell you to register an app and grant consent | That applies to the older, manually-registered audience values. With the Microsoft-registered app ID `c632b3df-fb67-4d84-bdcf-b95ad541b5c8` neither is needed |
+| `Install-DataGateway -AcceptConditions` fails | "Login first with Login-DataGatewayServiceAccount" — the cmdlet needs an authenticated session just to fetch the installer. Run the vendor installer directly with `-q -norestart` instead; that *is* silent |
+| `Add-DataGatewayCluster` rejects a service principal | Documented: "must be run with a user based credential". Registration cannot be automated. Budget one RDP |
+| Gateway registers but Fabric cannot use it | `-RegionKey` was pinned. "For Power BI, it can only be used in the default tenant region." Omit it |
+| `Install-PackageProvider -Name NuGet` fails on PowerShell 7 | That is 5.1 advice; PowerShellGet 2.x already has what it needs |
+| Fabric auth fails after a container rebuild | `FABRICRO` is an OS user in the container's `/etc/passwd`, which is an image layer, not the `/database` volume. The GRANTs survive and point at a user that no longer exists |
+
 ---
 
 ## Status
@@ -312,7 +390,11 @@ And one from the same family, in a different tool:
 | Delta batch, watermark movement proven | done, IDs 23,761,875-23,762,124 |
 | CSV fallback, reconciled against Db2 | done, 21/21 on real data |
 | Negative tests: tampered / missing / stray files | done, all correctly rejected |
-| Azure VM, gateway, Fabric, medallion, agent | deferred — `docs/roadmap.md` |
+| **Azure VM, Db2 11.5.9.0 + TLS, gateway installed** | **done — `docs/runbook-phase1.md`** |
+| **Gateway registered and Online, Fabric connection bound + tested** | **done** |
+| **Db2 off the public internet — P2S VPN, everything else denied** | **done** |
+| Copy activity smoke test (`NBKI.CUSTOMERS` → `lh_bronze`) | outstanding — `docs/session-handoff.md` |
+| Medallion, semantic model, report, data agent | deferred — `docs/roadmap.md` |
 
 Data files are not committed: the primary dataset is ~1.4 GB and the AML set
 reaches 41 GB, and we redistribute nothing — only the scripts that fetch it.

@@ -31,6 +31,15 @@ DB2_PORT="${DB2_PORT:-50000}"
 # publishing it on every host interface is not something to do by accident.
 # Set DB2_BIND=0.0.0.0 deliberately when a gateway or another host must reach it.
 DB2_BIND="${DB2_BIND:-127.0.0.1}"
+# Optional second listener, for TLS. Unset by default, so the local validation
+# path is byte-for-byte what it always was; set it on a host where Db2 has an
+# SSL service configured (see infra/bootstrap_db2.sh) and the container will also
+# publish that port on every interface.
+#
+# The split matters: 50000 stays on DB2_BIND (loopback locally) and carries
+# cleartext DRDA, while only the TLS port is ever exposed beyond the host. There
+# is deliberately no way to publish 50000 publicly by setting one variable.
+DB2_TLS_PORT="${DB2_TLS_PORT:-}"
 DB2_VOLUME="${DB2_VOLUME:-db2demo-data}"
 WAIT_SECONDS="${WAIT_SECONDS:-900}"
 
@@ -53,7 +62,17 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 container_state() {
-  docker inspect -f '{{.State.Status}}' "${DB2_CONTAINER}" 2>/dev/null || echo "absent"
+  # Deliberately not the obvious one-liner:
+  #     docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo "absent"
+  # On Docker 29 a missing container makes `docker inspect -f` emit an empty
+  # line on STDOUT *and* exit non-zero, so that version captures a literal
+  # "\nabsent" and the case statement below falls through to "unexpected
+  # container state". Older Docker printed nothing and the bug was invisible.
+  # Take the last non-empty line and treat nothing at all as absent.
+  local s
+  s="$(docker inspect -f '{{.State.Status}}' "${DB2_CONTAINER}" 2>/dev/null \
+       | sed '/^[[:space:]]*$/d' | tail -n 1 || true)"
+  if [[ -n "${s}" ]]; then echo "${s}"; else echo "absent"; fi
 }
 
 if [[ "${STATUS_ONLY}" -eq 1 ]]; then
@@ -99,11 +118,15 @@ case "${state}" in
     # the instance at startup. AUTOCONFIG and SAMPLEDB are off to keep first
     # start as short as possible, and ARCHIVE_LOGS is off because nothing here
     # needs point-in-time recovery.
+    publish=( -p "${DB2_BIND}:${DB2_PORT}:50000" )
+    if [[ -n "${DB2_TLS_PORT}" ]]; then
+      publish+=( -p "0.0.0.0:${DB2_TLS_PORT}:${DB2_TLS_PORT}" )
+    fi
     docker run -d \
       --name "${DB2_CONTAINER}" \
       --platform linux/amd64 \
       --privileged=true \
-      -p "${DB2_BIND}:${DB2_PORT}:50000" \
+      "${publish[@]}" \
       -e LICENSE=accept \
       -e "DB2INST1_PASSWORD=${DB2_PASSWORD}" \
       -e "DBNAME=${DB2_DATABASE}" \
@@ -123,7 +146,22 @@ esac
 # Readiness. Db2's own log line is not sufficient — the instance announces
 # itself before the database will actually answer a query. The only reliable
 # test is a successful SELECT.
+#
+# The staging directory has to be created BEFORE that test, not after it. The
+# readiness probe goes through db2_query, which ships its SQL in with
+# `docker cp` into ${DB2_STAGE}; on a container that has just been created that
+# directory does not exist, the copy fails, the probe never succeeds, and the
+# script waits the full timeout against a database that has actually been up for
+# ten minutes. Creating the directory first costs nothing and removes a failure
+# mode that only ever appears on a genuinely fresh container — which is to say,
+# on the demo machine rather than on the developer's.
 # ---------------------------------------------------------------------------
+echo "==> Preparing the staging directory"
+for _ in $(seq 1 30); do
+  if db2_prep_stage 2>/dev/null; then break; fi
+  sleep 2
+done
+
 echo "==> Waiting for ${DB2_DATABASE} to accept SQL (up to ${WAIT_SECONDS}s)"
 if [[ "$(uname -m)" == "arm64" ]]; then
   echo "    Apple silicon: running under emulation, first start takes a few minutes."
