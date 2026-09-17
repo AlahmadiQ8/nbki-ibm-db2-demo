@@ -312,11 +312,37 @@ decision**, not a footnote. Settle it before the demo.
 load → show exactly which records moved and the control totals → show the quarantined bad batch and its
 correction → rerun to prove idempotency → one governed report → "here's what changes for Equation."
 
+> ### ⚠️ Superseded on the incremental beat — read before using this storyline
+>
+> This section predates the bronze build. **Fabric's Copy job incremental read
+> from Db2 was tested and it fails** — reproduced on a single 109-row table.
+> "Trigger an incremental load → show exactly which records moved" is not
+> currently demonstrable, and a presenter following this paragraph will walk
+> into a failing run in front of the customer.
+>
+> What replaces it: the **full landing** — 27,307,478 rows from Db2 into bronze
+> in **10m31s**, reconciled **77/77** to the source. For a bank whose current
+> process is a full manual extract, that is the like-for-like comparison anyway.
+>
+> Details in `docs/roadmap.md` Phase 4; the corrected slide wording is in
+> `docs/demo-narrative.md`.
+
 ### P0 spike — before anything else
 
 Db2 CE on the VM → on-premises data gateway → one Fabric pipeline reads one Db2 table **over TLS, as the
 least-privileged account, with a correct incremental second run.** Not merely "a table can be read."
 Nothing else starts until this passes.
+
+> **Outcome of this spike: passed, except the last clause.** TLS as `FABRICRO`
+> is proven, and reading is proven at 27.3M rows across six tables. The
+> **incremental second run fails**, and it is a product limitation, not a
+> configuration mistake — the portal-built definition behaves identically.
+>
+> The gate as written — *"nothing else starts until this passes"* — would stop
+> the whole demo. That is not the right call: everything downstream of bronze is
+> unaffected by how bronze is refreshed. The gate is therefore **relaxed
+> deliberately, not quietly**: build on the full load, and describe change
+> capture as design and roadmap rather than showing it.
 
 ### Explicitly cut vs. earlier revisions
 

@@ -57,9 +57,20 @@ that a running database is already using.
 ## Day to day
 
 ```bash
-./infra/stop.sh     # deallocate both VMs. ~$320/month if you forget
-./infra/start.sh    # start VMs AND Db2 AND check FABRICRO AND check the gateway
+./infra/stop.sh                # deallocate both VMs. ~$320/month if you forget
+./infra/start.sh               # capacity + VMs + Db2 + TLS + FABRICRO + gateway
+./infra/start.sh --via-azure   # same, with no VPN (az vm run-command)
 ```
+
+**The environment also takes itself down.** A tenant automation deallocated both
+VMs and paused the F8 capacity at 21:47 UTC, unasked — so `start.sh` is not only
+for recovering from `stop.sh`. It resumes the capacity first, because a paused
+F-SKU is invisible until Fabric starts returning bare HTTP 404s (`CapacityNotActive`,
+which `curl -f` hides) on calls that have nothing to do with capacity.
+
+It probes SSH first and falls back to `az vm run-command` automatically when the
+VPN is down, rather than timing out and blaming the VM. `--via-azure` skips the
+probe. Both paths are idempotent.
 
 **Do not use `az vm start` on its own.** Two separate things break, and both
 present as "Fabric cannot reach the source":
@@ -533,6 +544,8 @@ co-locating the gateway with the database in production.
 |---|---|
 | SSH times out, IP unchanged | The tenant control deleted `allow-ssh-operator`. Re-create it, or use Bastion |
 | `docker ps` empty after `az vm start` | No restart policy on the container by design. Use `./infra/start.sh` |
+| Everything Fabric returns **HTTP 404**, including calls that worked minutes ago | The **capacity is paused**. The body says `CapacityNotActive` but `curl -f` suppresses it, so it reads like a bad workspace id or an expired token. `./infra/start.sh` resumes it |
+| `az vm run-command` → `OperationNotAllowed: requires the VM to be running` | A tenant automation deallocated the VMs overnight. `./infra/start.sh --via-azure` brings the whole environment back without needing the VPN |
 | Fabric says the source is unreachable after a stop/start, and every setting looks right | **`DB2COMM` reverted to `TCPIP`.** The Db2 CE image's entrypoint sets it on every container start, silently dropping SSL. The keystore, `SSL_SVCENAME` and `SSL_SVR_LABEL` all survive on the `/database` volume and the port stays published, so nothing looks wrong — but nothing listens on 50001. `./infra/start.sh` re-asserts it; check with `db2set -all \| grep DB2COMM`, which must read `TCPIP,SSL` |
 | Fabric auth fails, nothing changed | The container was rebuilt. `FABRICRO` lives in the container's `/etc/passwd`, not the `/database` volume, so it is gone while the GRANTs remain. Re-run `scripts/14_create_fabricro.sh` |
 | `Test connection` fails with a TLS error | The gateway does not trust the Db2 certificate. Run `./infra/trust_cert_on_gateway.sh`. Re-run it after any keystore regeneration |

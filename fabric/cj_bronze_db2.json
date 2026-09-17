@@ -1,0 +1,302 @@
+{
+  "properties": {
+    "jobMode": "CDC",
+    "fullLoadBehavior": "Truncate",
+    "source": {
+      "type": "Db2Table",
+      "connectionSettings": {
+        "type": "Db2",
+        "externalReferences": {
+          "connection": "d247ae2f-a0c6-4c89-a8a6-82b81dcd9f25"
+        }
+      }
+    },
+    "destination": {
+      "type": "LakehouseTable",
+      "connectionSettings": {
+        "type": "Lakehouse",
+        "typeProperties": {
+          "workspaceId": "5c84bcc5-f497-4eac-b59b-5c2a36bec619",
+          "artifactId": "56ba34ce-c8c8-467e-a1a9-8952b7b03dba",
+          "rootFolder": "Tables"
+        }
+      }
+    },
+    "policy": {
+      "timeout": "0.12:00:00",
+      "retry": 0
+    }
+  },
+  "activities": [
+    {
+      "id": "5f7c3c62-f14d-55e1-835a-46fe60d6e4c4",
+      "properties": {
+        "source": {
+          "datasetSettings": {
+            "schema": "NBKI",
+            "table": "MCC_CODES"
+          },
+          "changeDataSettings": {
+            "readMethod": "SnapshotPlusIncremental",
+            "columns": [
+              {
+                "name": "LAST_UPDATED_TS",
+                "type": "DateTime"
+              }
+            ],
+            "nullWatermarkBehavior": "Skip"
+          }
+        },
+        "destination": {
+          "upsertSettings": {
+            "keys": [
+              "MCC_CODE"
+            ]
+          },
+          "writeBehavior": "Upsert",
+          "datasetSettings": {
+            "table": "MCC_CODES"
+          },
+          "applyVOrder": false,
+          "enableTimestampNtz": false,
+          "enableChangeDataFeed": false
+        },
+        "enableStaging": false,
+        "translator": {
+          "type": "TabularTranslator"
+        },
+        "typeConversionSettings": {
+          "typeConversion": {
+            "allowDataTruncation": false,
+            "treatBooleanAsNumber": false
+          }
+        }
+      }
+    },
+    {
+      "id": "4094f623-4d4b-5a1f-b6c9-6060665ce7e5",
+      "properties": {
+        "source": {
+          "datasetSettings": {
+            "schema": "NBKI",
+            "table": "CUSTOMERS"
+          },
+          "changeDataSettings": {
+            "readMethod": "SnapshotPlusIncremental",
+            "columns": [
+              {
+                "name": "LAST_UPDATED_TS",
+                "type": "DateTime"
+              }
+            ],
+            "nullWatermarkBehavior": "Skip"
+          }
+        },
+        "destination": {
+          "upsertSettings": {
+            "keys": [
+              "CUSTOMER_ID"
+            ]
+          },
+          "writeBehavior": "Upsert",
+          "datasetSettings": {
+            "table": "CUSTOMERS"
+          },
+          "applyVOrder": false,
+          "enableTimestampNtz": false,
+          "enableChangeDataFeed": false
+        },
+        "enableStaging": false,
+        "translator": {
+          "type": "TabularTranslator"
+        },
+        "typeConversionSettings": {
+          "typeConversion": {
+            "allowDataTruncation": false,
+            "treatBooleanAsNumber": false
+          }
+        }
+      }
+    },
+    {
+      "id": "352e510b-3900-5518-8fb5-6619d5e855c8",
+      "properties": {
+        "source": {
+          "datasetSettings": {
+            "schema": "NBKI",
+            "table": "CARDS"
+          },
+          "changeDataSettings": {
+            "readMethod": "SnapshotPlusIncremental",
+            "columns": [
+              {
+                "name": "LAST_UPDATED_TS",
+                "type": "DateTime"
+              }
+            ],
+            "nullWatermarkBehavior": "Skip"
+          }
+        },
+        "destination": {
+          "upsertSettings": {
+            "keys": [
+              "CARD_ID"
+            ]
+          },
+          "writeBehavior": "Upsert",
+          "datasetSettings": {
+            "table": "CARDS"
+          },
+          "applyVOrder": false,
+          "enableTimestampNtz": false,
+          "enableChangeDataFeed": false
+        },
+        "enableStaging": false,
+        "translator": {
+          "type": "TabularTranslator"
+        },
+        "typeConversionSettings": {
+          "typeConversion": {
+            "allowDataTruncation": false,
+            "treatBooleanAsNumber": false
+          }
+        }
+      }
+    },
+    {
+      "id": "16d5f420-c623-57c4-85c2-d1e04abeaae8",
+      "properties": {
+        "source": {
+          "datasetSettings": {
+            "schema": "NBKI",
+            "table": "AML_TRANSACTIONS"
+          },
+          "changeDataSettings": {
+            "readMethod": "SnapshotPlusIncremental",
+            "columns": [
+              {
+                "name": "LAST_UPDATED_TS",
+                "type": "DateTime"
+              }
+            ],
+            "nullWatermarkBehavior": "Skip"
+          }
+        },
+        "destination": {
+          "upsertSettings": {
+            "keys": [
+              "AML_TXN_ID"
+            ]
+          },
+          "writeBehavior": "Upsert",
+          "datasetSettings": {
+            "table": "AML_TRANSACTIONS"
+          },
+          "applyVOrder": false,
+          "enableTimestampNtz": false,
+          "enableChangeDataFeed": false
+        },
+        "enableStaging": false,
+        "translator": {
+          "type": "TabularTranslator"
+        },
+        "typeConversionSettings": {
+          "typeConversion": {
+            "allowDataTruncation": false,
+            "treatBooleanAsNumber": false
+          }
+        }
+      }
+    },
+    {
+      "id": "845fa84c-8da1-5259-85c1-375fccb7c741",
+      "properties": {
+        "source": {
+          "datasetSettings": {
+            "schema": "NBKI",
+            "table": "FRAUD_LABELS"
+          },
+          "changeDataSettings": {
+            "readMethod": "SnapshotPlusIncremental",
+            "columns": [
+              {
+                "name": "LAST_UPDATED_TS",
+                "type": "DateTime"
+              }
+            ],
+            "nullWatermarkBehavior": "Skip"
+          }
+        },
+        "destination": {
+          "upsertSettings": {
+            "keys": [
+              "TRANSACTION_ID"
+            ]
+          },
+          "writeBehavior": "Upsert",
+          "datasetSettings": {
+            "table": "FRAUD_LABELS"
+          },
+          "applyVOrder": false,
+          "enableTimestampNtz": false,
+          "enableChangeDataFeed": false
+        },
+        "enableStaging": false,
+        "translator": {
+          "type": "TabularTranslator"
+        },
+        "typeConversionSettings": {
+          "typeConversion": {
+            "allowDataTruncation": false,
+            "treatBooleanAsNumber": false
+          }
+        }
+      }
+    },
+    {
+      "id": "03d66df0-c59e-5517-8d47-a3f2fc56da58",
+      "properties": {
+        "source": {
+          "datasetSettings": {
+            "schema": "NBKI",
+            "table": "TRANSACTIONS"
+          },
+          "changeDataSettings": {
+            "readMethod": "SnapshotPlusIncremental",
+            "columns": [
+              {
+                "name": "LAST_UPDATED_TS",
+                "type": "DateTime"
+              }
+            ],
+            "nullWatermarkBehavior": "Skip"
+          }
+        },
+        "destination": {
+          "upsertSettings": {
+            "keys": [
+              "TRANSACTION_ID"
+            ]
+          },
+          "writeBehavior": "Upsert",
+          "datasetSettings": {
+            "table": "TRANSACTIONS"
+          },
+          "applyVOrder": false,
+          "enableTimestampNtz": false,
+          "enableChangeDataFeed": false
+        },
+        "enableStaging": false,
+        "translator": {
+          "type": "TabularTranslator"
+        },
+        "typeConversionSettings": {
+          "typeConversion": {
+            "allowDataTruncation": false,
+            "treatBooleanAsNumber": false
+          }
+        }
+      }
+    }
+  ]
+}

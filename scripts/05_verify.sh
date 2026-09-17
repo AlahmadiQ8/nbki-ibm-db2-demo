@@ -54,6 +54,13 @@ if [[ ! -f "${MANIFEST}" ]]; then
 fi
 
 echo "==> Verifying ${DB2_SCHEMA} in ${DB2_DATABASE}"
+
+# Check the database is actually reachable BEFORE running 23 checks against it.
+# Without this, an unreachable Db2 -- a deallocated VM, a stopped container --
+# makes every single check fail with an empty result, and the report reads as
+# "the data is catastrophically wrong" rather than "nothing was asked". That is
+# a genuinely alarming way to start a demo day, and it is a lie.
+db2_require_running
 echo
 
 # -- Has the delta been applied? ---------------------------------------------

@@ -14,28 +14,122 @@ exists right now. The other documents explain *why* things are the way they are:
 
 ## Where this got to
 
-**Phase 1 and Phase 2 are complete, end to end.** Db2 runs on Azure with the real
-27.3M-row dataset, a SQL client reaches it over TLS as a least-privileged account,
-the on-premises data gateway is registered and Online, two Fabric connections are
-bound to it, and **a Copy job has successfully landed Db2 data into a Fabric
-Lakehouse**. The ingestion path the whole demo rests on is proven.
+**Phases 1 and 2 are complete. Bronze is now landed and verified** — all six
+tables, 27,307,478 rows, in `lh_bronze` as Delta, reconciling to the source
+exactly. Next is **silver**; see `docs/roadmap.md`.
 
-**Phases 1 and 2 are complete** — ingestion is proven. **Next is Phase 3**, the
-medallion build. See `docs/roadmap.md`.
+Read the two findings under "What bronze proved, and what it disproved" before
+saying anything about incremental to a customer. One of them retires a claim the
+previous handoff was optimistic about.
 
 ### Proven, by running it
 
 | Check | Result |
 |---|---|
-| `05_verify.sh` on the VM | **23/23**, control totals tie exactly |
-| `09_reconcile.sh` on the VM | **21/21** |
+| `05_verify.sh` (Db2 aggregates, all six tables) | **23/23**, control totals tie exactly |
+| `18_assert_pristine.sh` (delta unspent) | **3/3** |
+| `09_reconcile.sh` (CSV fallback, transactions, 3 months) | **21/21** |
 | `04_load.sh` | 27,307,478 rows, **0 rejected** |
-| `15_client_test.py` over TLS as `FABRICRO` | **7/7**, six counts exact, DELETE refused `SQL0551N` |
-| VS Code Db2 extension over JDBC + TLS | connects, returns all six counts |
-| **Copy job → `lh_bronze.CUSTOMERS`** | **2,000 rows**, verified from the Delta log *and* the Parquet footer |
-| Copy job mode | **CDC / `SnapshotPlusIncremental`** on `LAST_UPDATED_TS` — snapshot leg proven, incremental leg **not** |
-| Public exposure | **none** — no Db2 port reachable from the internet; VPN + Bastion only |
-| Two full `stop.sh` → `start.sh` cycles | green each time |
+| `15_client_test.py` over TLS as `FABRICRO` | **7/7**, DELETE refused `SQL0551N` |
+| **`17_verify_bronze.py` — bronze vs source** | **77/77**, every control total exact |
+| **Bronze initial load, six tables** | **27,307,478 rows in 10m31s** (~43k rows/s) |
+| Copy job **incremental** leg | **FAILS** — reproducible, see below |
+| Public exposure | **none** — VPN + Bastion only |
+
+> **Scope correction, carried forward.** `09_reconcile.sh` is **7 checks against
+> each of 3 monthly transaction extracts** — it covers the CSV fallback path for
+> `TRANSACTIONS` only, not all six tables. `05_verify.sh` is the all-table Db2
+> reconciliation. Earlier notes cited 21/21 as though it were the latter.
+
+---
+
+## What bronze proved, and what it disproved
+
+### It works, and it is fast
+
+27.3M rows across six tables landed in **10 minutes 31 seconds** through the
+on-premises gateway — roughly 43,000 rows/second, with no auto-partitioning
+(Copy job does not offer it for Db2). That figure is the evidence for the
+"Slow → throughput at scale" line on the demo's Slide 3, which was previously
+unevidenced.
+
+`17_verify_bronze.py` then checks 65 things and passes all of them: row counts,
+exact control totals, Db2→Delta type mapping, merge-key uniqueness, null
+profiles, and value domains.
+
+Two type results worth keeping:
+
+- **`DECIMAL(23,6)` lands as Delta `decimal(23,6)`, not a double.** The AML total
+  ties to all six places — `30412817094323.869350`. A silent demotion to double
+  would have rounded the crypto rows and still looked approximately right.
+- **Timestamps do not shift.** Db2 `2026-09-15-08.18.10.189024` arrives as
+  `2026-09-15 08:18:10.189024+00:00` — identical wall-clock to the microsecond,
+  despite `enableTimestampNtz: false`. The naive Db2 value is labelled UTC rather
+  than moved. This was settled with a 109-row probe *before* the 27.3M-row load.
+
+  > The residual risk is downstream, not here: the value is *labelled* UTC, so a
+  > report rendering in a non-UTC session timezone will display something else.
+  > That is a silver / semantic-model decision, and it needs making deliberately.
+
+### The incremental leg fails — this retires a hoped-for claim
+
+The previous handoff recorded the incremental leg as "not yet proven" and
+recommended proving it. It has now been tested, and **it does not work.**
+
+Minimal reproduction — one table, 109 rows:
+
+    single-table Copy job, Db2 NBKI.MCC_CODES -> Lakehouse
+    run 1, initial snapshot .................. Completed
+    touch one source row (watermark advances)
+    run 2, incremental ....................... Failed
+
+- Fails identically with `writeBehavior: Upsert` **and** `Append`, so the fault is
+  in the incremental **read** from Db2, not the merge.
+- Db2's `db2diag.log` records nothing for the attempt.
+- The error is only ever `Operation on target CopyJobActivityLoop failed …
+  Inner activity name: ConditionalCopy`.
+- The portal-built definition configures it identically, so this is not an
+  artefact of generating the JSON by hand.
+
+**Operational consequence: a CDC Copy job works exactly once.** Every run after
+the first takes the incremental path and fails. Re-land with
+`./scripts/16_fabric_pipeline.sh --reland`, which deletes, recreates and runs —
+recreating resets the job to "never run".
+
+> This is precisely what the repo's own rule was for: *do not put it on a slide
+> on the strength of the exported JSON.* The exported JSON says
+> `jobMode: CDC, readMethod: SnapshotPlusIncremental`. It runs snapshots. It does
+> not do incremental.
+
+### `Batch` mode is not an escape hatch, and shows `--export` is lossy
+
+Switching to `jobMode: Batch` — a full snapshot every run — looks like the
+obvious fix. It fails immediately:
+
+    The expression 'if(equals(pipeline().parameters?.latestCheckpoints
+    ?[item().checkpointName], null), ...)' cannot be evaluated because
+    property 'checkpointName' doesn't exist
+
+The runtime requires a `checkpointName` on every activity. In CDC mode it is
+derived from `changeDataSettings`; with none, there is nothing to derive it from.
+
+**The finding underneath is the important one: `--export` is not lossless.** A
+definition exported from a working portal-built job carries no `checkpointName`,
+and none is mentioned anywhere in the published Copy job definition schema. So a
+committed definition can be recreated faithfully in the mode it was built in, but
+cannot be freely edited into another mode. "Build in the portal, export, commit"
+still holds — this is a concrete limit on what may be changed afterwards.
+
+### Audit columns: real, wanted, and not yet applied
+
+Copy job now supports per-row audit columns — extraction time, workspace ID, job
+ID, **run ID**, job name, incremental window bounds, and custom static values.
+That is exactly the provenance the demo narrative promises, with no custom code.
+
+They are **not** applied, because the JSON shape is unpublished. A shape found
+online was tried and **rejected with HTTP 400**; the identical definition was
+accepted the moment the block was removed. Adding them is a portal pass followed
+by `--export`, and it will require re-landing, since they add columns.
 
 ---
 
@@ -57,9 +151,126 @@ medallion build. See `docs/roadmap.md`.
 | Item | ID |
 |---|---|
 | Workspace | `5c84bcc5-f497-4eac-b59b-5c2a36bec619` |
-| Lakehouse `lh_bronze` | `56ba34ce-c8c8-467e-a1a9-8952b7b03dba` — contains `CUSTOMERS` (2,000 rows) |
+| Lakehouse `lh_bronze` | `56ba34ce-c8c8-467e-a1a9-8952b7b03dba` |
 | SQL endpoint (same lakehouse) | `640253d8-8ea7-4683-b294-01bdd8188162` |
 | Gateway `nbki-db2-gw` | `b35258fb-ff47-4221-8749-b551885e4ce1` |
+| Copy job `cj_bronze_db2` | recreated on every re-land, so the id changes — find it with `--list` |
+| Capacity `momof8sweden` (F8, Sweden Central) | in resource group `fabric-playground-sweden` |
+
+### Bronze contents — verified by `17_verify_bronze.py`, 77/77
+
+| Table | Rows | Merge key |
+|---|---:|---|
+| `MCC_CODES` | 109 | `MCC_CODE` |
+| `CUSTOMERS` | 2,000 | `CUSTOMER_ID` |
+| `CARDS` | 6,146 | `CARD_ID` |
+| `AML_TRANSACTIONS` | 5,078,345 | `AML_TXN_ID` |
+| `FRAUD_LABELS` | 8,914,963 | `TRANSACTION_ID` |
+| `TRANSACTIONS` | 13,305,915 | `TRANSACTION_ID` |
+| **Total** | **27,307,478** | |
+
+`FRAUD_LABELS` splits `No` = 8,901,631 / `Yes` = 13,332. No audit columns yet —
+see above.
+
+> **The previous session's Copy job had vanished from the workspace** when this
+> one started; only `lh_bronze` and its SQL endpoint remained. Cause unknown,
+> most likely a manual deletion. The committed definition was the only surviving
+> record — and `--create` could not actually restore it, because it hardcoded
+> `DataPipeline`. Both are fixed: `--create` handles `CopyJob`, and
+> `--verify-restore` proves a committed definition round-trips without running it.
+
+---
+
+## The environment shuts itself down overnight
+
+**New, and it will catch you.** At **21:47 UTC** during this session an automated
+tenant identity deallocated **both VMs**, and the **F8 capacity was found
+paused**. Neither was requested by any script here.
+
+This is the same family of governed-tenant behaviour already recorded for NSG
+rules and storage accounts. Budget for it: *the demo environment does not stay up
+by itself.*
+
+Symptoms, so they are recognisable rather than mysterious:
+
+| What you see | What it is |
+|---|---|
+| `az vm run-command` → `OperationNotAllowed: requires the VM to be running` | VMs deallocated |
+| Any Fabric item create → **HTTP 404** with `CapacityNotActive` | capacity paused |
+| `05_verify.sh` reporting **22 of 23 checks failed** with empty values | Db2 unreachable, *not* bad data |
+
+The last one was actively misleading, so `05_verify.sh` now calls
+`db2_require_running` first and fails with one clear message instead.
+
+### Bringing it back up — one command
+
+```bash
+./infra/start.sh              # uses SSH when the VPN is up
+./infra/start.sh --via-azure  # no VPN: everything over az vm run-command
+```
+
+`start.sh` now does the whole recovery, and **probes SSH first** — if the VPN is
+down it falls back to `az vm run-command` automatically rather than waiting ten
+minutes and then blaming the VM. It is idempotent; running it against a healthy
+environment just confirms each step.
+
+What it covers, in order:
+
+1. **Resumes the Fabric capacity** if paused. This is first because a paused
+   F-SKU is invisible until Fabric starts returning bare 404s on unrelated calls.
+2. Starts both VMs and waits for them.
+3. Starts the Db2 container — it has **no restart policy**, so a VM boot leaves
+   it stopped — and waits for a real `SELECT` to succeed.
+4. **Re-asserts TLS.** The image's entrypoint resets `DB2COMM` to `TCPIP` on
+   every container start, dropping SSL. Reproduced live this session: `DB2COMM`
+   came back as `TCPIP` with the keystore, `SSL_SVCENAME` and the published port
+   all still correct — nothing looks wrong, and nothing listens on 50001.
+5. Verifies the listener is actually up, and recreates `FABRICRO` if the
+   container was rebuilt.
+6. Checks the gateway service and that it can still reach Db2.
+
+Expected output when healthy:
+
+```
+==> Checking the Fabric capacity (momof8sweden)
+    Active
+==> Starting both VMs
+==> Starting Db2 and re-asserting TLS via az vm run-command
+    [i] DB2COMM=TCPIP,SSL
+    TLS_LISTENING=yes
+    FABRICRO=present
+==> Checking the gateway
+Running
+db2 reachable: True
+```
+
+> **Never use plain `az vm start` on its own.** It leaves the container stopped,
+> and once started, `DB2COMM` is back to `TCPIP` with SSL gone. Fabric then
+> reports the source as unreachable with nothing visibly misconfigured — the
+> single most likely way to arrive at a customer session with a broken demo.
+
+The capacity resource defaults to `momof8sweden` in `fabric-playground-sweden`;
+override with `NBKI_FABRIC_CAPACITY` / `NBKI_FABRIC_CAPACITY_RG`.
+
+---
+
+## Talking to Db2 without the VPN
+
+The VPN dropped mid-session, which presents as `SQL30081N` with protocol error
+`60` — a timeout that reads like Db2 being down when it is healthy.
+
+`scripts/_db2_lib.sh` now supports **`DB2_MODE=azure`**, which ships SQL over the
+Azure control plane with `az vm run-command` instead of a socket. No VPN, no SSH
+rule, no open port:
+
+```bash
+DB2_MODE=azure ./scripts/05_verify.sh
+DB2_MODE=azure ./scripts/18_assert_pristine.sh
+```
+
+Each call is an ARM round trip of 20–60 seconds, so it is for verification and
+inspection, not chatty loops. Bulk data staging is refused outright — a
+control-plane channel is not a data path — and says so.
 
 ### Two Db2 connections — do not delete either
 
@@ -104,7 +315,7 @@ Reopen the public path with a plain `./infra/deploy.sh`; re-lock with
 
 ---
 
-## Two findings that change what you'd say to a customer
+## Two connector findings that change what you'd say to a customer
 
 **1. The Fabric Copy engine does not speak TLS to Db2.** The Power Query path
 (connection test, Navigator, Dataflow Gen2) does; the Copy engine does not — on
@@ -124,42 +335,108 @@ on the Copy path, confined to one NIC inside a private VNet" is a real
 architectural point, and it is the argument for co-locating the gateway with the
 database in production.
 
-**2. Copy job *does* support watermark-based incremental for Db2** — the
-capability matrix saying "Full load only" is wrong. The wizard produced
-`jobMode: CDC`, `readMethod: SnapshotPlusIncremental` on `LAST_UPDATED_TS`, and
-`writeBehavior: Upsert` keyed on `CUSTOMER_ID`. It found and used the
-`ROW CHANGE TIMESTAMP` column this repo exists to provide — a much better demo
-than a pipeline hand-wired to do the same thing.
+**2. Copy job *offers* watermark incremental for Db2, and it does not work.**
 
-> **Still unproven: the incremental *behaviour*.** The first run was a snapshot.
-> Run `./scripts/08_apply_delta.sh` to move the watermark, then re-run the Copy
-> job and show it pick up the 250 inserts and 50 in-place updates. Do not put it
-> on a slide on the strength of the exported JSON alone — that is exactly the
-> mistake that put the wrong answer in the roadmap in the first place.
+~~The capability matrix saying "Full load only" is wrong.~~ The matrix has since
+been corrected to say watermark incremental **is** supported, and the wizard
+does produce `jobMode: CDC`, `readMethod: SnapshotPlusIncremental` on
+`LAST_UPDATED_TS`, `writeBehavior: Upsert`. It finds and uses the
+`ROW CHANGE TIMESTAMP` column this repo exists to provide.
+
+**It still does not work.** Configuring it and running it are different things,
+and this session ran it. See "What bronze proved, and what it disproved" above
+for the 109-row reproduction. The snapshot leg is solid — 27.3M rows, 10m31s.
+The incremental leg fails every time.
+
+> The previous version of this entry said the incremental *behaviour* was
+> "still unproven" and should be demonstrated before demoing. That advice was
+> right, it was taken, and the answer came back negative. The delta remains
+> unspent — `18_assert_pristine.sh` confirms 3/3 — but there is currently
+> nothing in Fabric that would consume it incrementally.
 
 ---
 
-## Next: Phase 3, the medallion build
+## Operating bronze
 
-`fabric/copyjob_bronze_customers.json` is the exported definition of the working
-Copy job — the reference for how a Db2 source and a Lakehouse sink are wired.
-`scripts/16_fabric_pipeline.sh` lists, exports, creates and runs both
-`DataPipeline` and `CopyJob` items.
+```bash
+# 0. the environment does not stay up by itself -- see above
+DB2_MODE=azure ./scripts/18_assert_pristine.sh     # 3/3, or stop and reload
+DB2_MODE=azure ./scripts/05_verify.sh              # 23/23
 
-Bear in mind when building it out:
+# 1. regenerate the definition (only if you changed 19_make_bronze_copyjob.py)
+./scripts/19_make_bronze_copyjob.py
 
-- **Authoring pipeline JSON by hand is unreliable.** Three hand-written
-  definitions each failed differently — cleartext-at-TLS-port, an
-  `InvalidCastException` because `connectionProperties` must be a dictionary, and
-  `Invalid type ''`. Build in the portal, then export.
+# 2. land it. --reland is delete + recreate + run: a CDC Copy job only does a
+#    full snapshot on its FIRST run, so recreating is how you re-land.
+./scripts/16_fabric_pipeline.sh --reland fabric/cj_bronze_db2.json cj_bronze_db2 CopyJob
+
+# 3. prove it
+.venv/bin/python scripts/17_verify_bronze.py       # 77/77
+```
+
+Expect about **10m30s** for the load, plus up to a few minutes in `--reland`
+waiting for Fabric to release the deleted item's display name.
+
+`17_verify_bronze.py` reads OneLake directly over REST — row counts come from the
+Delta transaction log at no data cost, and aggregates fetch only the Parquet
+column chunks they need via HTTP range requests. It needs no ODBC driver, no
+Spark session and no SQL endpoint, all three of which were unavailable here.
+
+> **Three `MCC_CODES` rows were touched in Db2** during this session
+> (`5812`, `5411`, `5511`) to exercise the incremental path —
+> `MCC_DESCRIPTION` was set to itself, so **no data changed**; only
+> `LAST_UPDATED_TS` advanced. Bronze was re-landed afterwards, so the two agree.
+> `TRANSACTIONS` was never touched, and the delta is unspent.
+
+---
+
+## Next: silver
+
+Bronze is done. The next build is **silver**: conform types, resolve the three
+date formats, apply the DQ rules, and **quarantine** failures rather than
+dropping them. `docs/roadmap.md` Phase 3 has the detail.
+
+Two smaller items worth taking first, because both are cheap and both improve
+what can be claimed:
+
+1. **Audit columns.** One portal pass on `cj_bronze_db2` to add extraction time,
+   run id, job name and a custom source tag, then `--export` and a re-land.
+   Turns the narrative's provenance promise from "the capability exists" into
+   "here it is, on every row". Note the JSON shape is unpublished, so it must be
+   done in the portal — a guessed shape is rejected with HTTP 400.
+2. **Re-check the incremental leg** when the Fabric release notes suggest
+   anything has changed. `19_make_bronze_copyjob.py --batch` and the 109-row
+   reproduction in its header make retesting a ten-minute job.
+
+Things to keep in mind when building it out:
+
+- **Hand-authoring is safe only from a proven shape.** Three hand-written
+  *pipeline* definitions each failed differently — cleartext-at-TLS-port, an
+  `InvalidCastException` because `connectionProperties` must be a dictionary,
+  and `Invalid type ''`. What worked for bronze was generating six activities by
+  substitution into an exported, known-good Copy job, then proving the round trip
+  with `--verify-restore` before running anything. Do that, not blind authoring.
+- **`--export` is not lossless.** It omits `checkpointName`, which the runtime
+  requires, so an exported definition cannot be edited into a different
+  `jobMode`. Build the new mode in the portal.
 - **`Package collection` is not a connection setting.** It is
-  `connectionProperties` on the Copy activity source. No `-805` has been seen so
-  far, so the portal default is evidently `NULLID`.
-- **Proving the incremental leg is the highest-value next experiment** — see
-  finding 2 above. It is the watermark story the whole demo is built on.
-- **`08_apply_delta.sh` has not been run on Azure.** It is a demo-time action —
-  applying it spends the watermark reveal and leaves the data mid-state, since
-  rollback is partial by design. To restore afterwards, re-run `04_load.sh`.
+  `connectionProperties` on the Copy activity source. No `-805` has been seen
+  across 27.3M rows, so the portal default is evidently `NULLID`.
+- **`08_apply_delta.sh` has still not been run on Azure**, deliberately. It is a
+  demo-time action; applying it spends the watermark reveal and leaves the data
+  mid-state, since rollback is partial by design. Restore with `04_load.sh`, and
+  check with `18_assert_pristine.sh` — which, unlike `05_verify.sh`, can tell a
+  rolled-back delta from a clean one.
+- **Bronze has no audit columns yet**, so silver cannot rely on a run id being
+  present on a bronze row. Carry your own batch identifier until item 1 is done.
+- **`AML_TXN_ID` is `GENERATED ALWAYS AS IDENTITY`.** It is fine as a merge key
+  while Db2 is the only writer, but it is a surrogate with no business meaning:
+  reload Db2 and the same business row can take a different id. Do not build a
+  silver key on it.
+- **Timestamps are labelled UTC in bronze.** The wall-clock values are preserved
+  exactly, but a downstream model rendering in another session timezone will
+  display something different. Decide this explicitly in silver rather than
+  inheriting it.
 
 ---
 

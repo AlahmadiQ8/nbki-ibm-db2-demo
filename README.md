@@ -138,8 +138,16 @@ scripts/
   13_gateway_register.ps1  register the cluster  (the one interactive step)
   14_create_fabricro.sh  create the read-only principal Fabric connects as
   15_client_test.py      connect from your workstation over TLS and assert every count
+  16_fabric_pipeline.sh  list/export/create/run Fabric Copy jobs and pipelines
+                         (--verify-restore proves a committed definition restores;
+                          --reland is delete + recreate + run, see its comments)
+  17_verify_bronze.py    prove the Fabric bronze lakehouse matches the source  (77 checks)
+  18_assert_pristine.sh  prove the delta is UNSPENT  (catches what 05_verify.sh cannot)
+  19_make_bronze_copyjob.py  generate the six-table bronze Copy job definition
   csv_check.py           parse the messy extracts and report what they REALLY hold
   _db2_lib.sh            shared Db2 transport  (read the comments before editing)
+                         DB2_MODE=azure talks over az vm run-command -- no VPN needed
+  _onelake.py            read Delta tables out of OneLake over HTTP range requests
   dev_make_fixtures.py   synthetic stand-ins, with the quirks of the real thing
 
 db2/
@@ -161,11 +169,14 @@ infra/
   teardown.sh            delete the resource group
 docs/
   session-handoff.md     CURRENT STATE — read this first in a new session
+  demo-narrative.md      the opening slides and speaker notes, with what may NOT be claimed
   feasibility.md         the original feasibility analysis
   dataset-selection.md   which datasets, why, licences, and what was rejected
   runbook-phase1.md      how to operate the Azure environment
   roadmap.md             everything deferred to follow-up sessions
-fabric/                  exported Fabric pipeline definitions
+fabric/
+  copyjob_bronze_customers.json  the original portal-built Copy job — the reference shape
+  cj_bronze_db2.json             GENERATED six-table bronze Copy job (19_make_bronze_copyjob.py)
 ```
 
 ## Running it
@@ -381,7 +392,16 @@ code that had passed every check on the Mac. Full detail in
 | `Add-DataGatewayCluster` rejects a service principal | Documented: "must be run with a user based credential". Registration cannot be automated. Budget one RDP |
 | Gateway registers but Fabric cannot use it | `-RegionKey` was pinned. "For Power BI, it can only be used in the default tenant region." Omit it |
 | `Install-PackageProvider -Name NuGet` fails on PowerShell 7 | That is 5.1 advice; PowerShellGet 2.x already has what it needs |
-| "Copy job for Db2 is full-load only" | **Not true.** The capability matrix says Full load, but the UI offers **CDC mode** and accepts it — `SnapshotPlusIncremental` watermarking on `LAST_UPDATED_TS` with `Upsert`. Test the tenant, not the matrix |
+| "Copy job for Db2 is full-load only" | **Effectively true, for the opposite reason to the documented one.** The matrix now says watermark incremental is supported, and the UI accepts `SnapshotPlusIncremental` on `LAST_UPDATED_TS`. But it **fails at runtime**: initial snapshot Completed, then a single touched row makes the next run Fail. Same with `Upsert` and `Append`, so it is the read, not the merge. 109-row reproduction in `docs/roadmap.md` Phase 4. This row has now been wrong in both directions — run it, do not read it |
+| A Copy job succeeds once, then fails forever | CDC mode runs the initial snapshot on the **first** run only; every later run takes the broken incremental path. Recreating the item resets it. `16_fabric_pipeline.sh --reland` does delete → recreate → run |
+| `jobMode: Batch` fails instantly with a `checkpointName` expression error | The runtime needs a `checkpointName` per activity, which CDC mode derives from `changeDataSettings`. **`--export` does not emit one**, and the published Copy job definition schema never mentions it — so an exported definition cannot simply be edited into Batch mode. Export is not lossless |
+| Creating any Fabric item returns a bare **HTTP 404** | The capacity is **paused**. The body says `CapacityNotActive`, but `curl -f` hides it, so it reads like a wrong workspace id or a dead token. Resume the F-SKU and retry |
+| Recreating an item you just deleted returns **HTTP 409** | `ItemDisplayNameNotAvailableYet` — Fabric holds a deleted item's display name for a few minutes. It is retriable; wait and repeat |
+| Both VMs deallocated and the capacity paused, overnight, unasked | An automated tenant identity does this — observed at 21:47 UTC. `az vm run-command` then reports `OperationNotAllowed`. Recover with `./infra/start.sh` (add `--via-azure` if the VPN is down); it resumes the capacity, starts the container and re-asserts TLS. The environment does not stay up by itself |
+| `05_verify.sh` reports 22 of 23 checks failed with **empty** values | Db2 was unreachable, not wrong. Every query returned nothing and each check compared against blank. It now calls `db2_require_running` first and fails with one clear message |
+| A verified-green Db2 can still be a spent demo | `05_verify.sh` detects the delta only by its 250 inserted IDs. A **rollback** removes those but cannot restore the 50 in-place updates, and they move no control total — so a half-spent delta passes 23/23. Use `18_assert_pristine.sh` |
+| `SQL30081N` protocol error `60` from a SQL client | The VPN dropped. It reads like Db2 being down. `DB2_MODE=azure` routes SQL over `az vm run-command` instead and needs no VPN at all |
+| A Copy job audit-column block is rejected with HTTP 400 | The audit-column JSON shape is **unpublished** — it is not in the Copy job definition schema, and a plausible shape found online is wrong. Configure audit columns in the portal, then export |
 | Copy job fails `EUSRIDNWPWD SQLCODE=-1040`, credentials are correct | Not an auth fault. The **pipeline Copy path does not negotiate TLS** while the Power Query path does, so it sent cleartext DRDA at the TLS port and Db2 answered `GSK_ERROR_BAD_MESSAGE`. Copy needs a separate cleartext connection; the hop is confined by NSG to the gateway NIC |
 | A JDBC SQL client rejects `db2cert.arm` | The IBM Db2 VS Code extension and other JDBC clients need a **JKS truststore + password**, not a PEM. `start_db2.sh` builds `~/.nbki-demo/db2-truststore.jks` |
 | `PATCH /v1/connections/{id}` "succeeds" but nothing changes | It returns HTTP 200 and **silently ignores `displayName`** for on-premises gateway connections |
@@ -408,7 +428,12 @@ code that had passed every check on the Mac. Full detail in
 | **Gateway registered and Online, Fabric connection bound + tested** | **done** |
 | **Db2 off the public internet — P2S VPN, everything else denied** | **done** |
 | **Ingestion proven: Copy job → `lh_bronze.CUSTOMERS`, 2,000 rows** | **done** |
-| Medallion, semantic model, report, data agent | next — `docs/roadmap.md` |
+| **Bronze: all 6 tables, 27,307,478 rows, Db2 → `lh_bronze`** | **done — 10m31s, ~43k rows/s** |
+| **Bronze verification: 77 checks against the source** | **done, 77/77** |
+| Source-pristine assertion (delta unspent) | done, 3/3 — `18_assert_pristine.sh` |
+| Fabric Copy job **incremental** from Db2 | **tested — does not work**, see `docs/roadmap.md` |
+| Bronze audit columns (row-level provenance) | not applied — JSON shape unpublished, needs a portal pass |
+| Silver, gold, semantic model, report, data agent | next — `docs/roadmap.md` |
 
 Data files are not committed: the primary dataset is ~1.4 GB and the AML set
 reaches 41 GB, and we redistribute nothing — only the scripts that fetch it.
