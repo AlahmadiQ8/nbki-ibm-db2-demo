@@ -40,3 +40,10 @@ data/profile/
 .idea/
 .vscode/
 *.swp
+
+# draw.io writes an auto-backup beside the file it is editing while the app has
+# it open. It is a scratch copy of work in progress, not a diagram anyone should
+# review or restore from, and it reappears on every edit.
+.$*.drawio.bkp
+*.drawio.bkp
+*.drawio.dtmp

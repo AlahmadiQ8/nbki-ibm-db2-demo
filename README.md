@@ -170,6 +170,9 @@ infra/
 docs/
   session-handoff.md     CURRENT STATE — read this first in a new session
   demo-narrative.md      the opening slides and speaker notes, with what may NOT be claimed
+  architecture/
+    db2-to-fabric.drawio.{svg,png}  source -> gateway -> medallion -> serve; Slide 0
+    db2-schema-erd.drawio           the six NBKI tables, their keys and relationships
   feasibility.md         the original feasibility analysis
   dataset-selection.md   which datasets, why, licences, and what was rejected
   runbook-phase1.md      how to operate the Azure environment

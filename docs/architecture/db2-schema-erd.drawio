@@ -1,0 +1,251 @@
+<mxfile host="Electron">
+  <diagram name="Db2 NBKI schema" id="nbki-db2-erd">
+    <mxGraphModel dx="1885" dy="1133" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="b1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1F3A5F;strokeColor=none;fontColor=#ffffff;align=left;spacingLeft=20;verticalAlign=middle;shadow=1;" value="&lt;b style=&quot;font-size:20px&quot;&gt;NBKI &amp;mdash; Db2 demo schema&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px&quot;&gt;Entity relationships and data volume &amp;nbsp;&amp;middot;&amp;nbsp; IBM Db2 11.5.9 LUW &amp;nbsp;&amp;middot;&amp;nbsp; schema &lt;b&gt;NBKI&lt;/b&gt; &amp;nbsp;&amp;middot;&amp;nbsp; 6 tables &amp;nbsp;&amp;middot;&amp;nbsp; &lt;b&gt;27,307,478 rows&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="76" width="1260" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tCUSTOMERS" parent="1" style="swimlane;html=1;childLayout=stackLayout;horizontal=1;startSize=54;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontColor=#1a1a1a;verticalAlign=middle;align=center;rounded=1;arcSize=6;shadow=1;swimlaneFillColor=#ffffff;" value="&lt;b style=&quot;font-size:14px&quot;&gt;NBKI.CUSTOMERS&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;2,000 rows  ·  customer master&lt;/font&gt;" vertex="1">
+          <mxGeometry height="252" width="300" x="40" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" parent="tCUSTOMERS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#7F3300&quot;&gt;PK&lt;/b&gt;&amp;nbsp; &lt;b&gt;CUSTOMER_ID&lt;/b&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; INTEGER&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" parent="tCUSTOMERS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; CREDIT_SCORE&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; SMALLINT&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" parent="tCUSTOMERS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; YEARLY_INCOME&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; DECIMAL(15,2)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="r5" parent="tCUSTOMERS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; TOTAL_DEBT&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; DECIMAL(15,2)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="r6" parent="tCUSTOMERS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; NUM_CREDIT_CARDS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; SMALLINT&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="158" as="geometry" />
+        </mxCell>
+        <mxCell id="r7" parent="tCUSTOMERS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#666666&quot;&gt;WM&lt;/b&gt;&amp;nbsp; LAST_UPDATED_TS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; TIMESTAMP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="f8" parent="tCUSTOMERS" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;whiteSpace=wrap;overflow=hidden;rounded=0;fontSize=9;fontColor=#666666;fontStyle=2;" value="6 of 15 columns shown  ·  source users_data.csv" vertex="1">
+          <mxGeometry height="42" width="300" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="tCARDS" parent="1" style="swimlane;html=1;childLayout=stackLayout;horizontal=1;startSize=54;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontColor=#1a1a1a;verticalAlign=middle;align=center;rounded=1;arcSize=6;shadow=1;swimlaneFillColor=#ffffff;" value="&lt;b style=&quot;font-size:14px&quot;&gt;NBKI.CARDS&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;6,146 rows  ·  card master&lt;/font&gt;" vertex="1">
+          <mxGeometry height="252" width="300" x="40" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="r9" parent="tCARDS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#7F3300&quot;&gt;PK&lt;/b&gt;&amp;nbsp; &lt;b&gt;CARD_ID&lt;/b&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; INTEGER&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="r10" parent="tCARDS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#10739E&quot;&gt;FK&lt;/b&gt;&amp;nbsp; &lt;i&gt;CUSTOMER_ID&lt;/i&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; INTEGER&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="r11" parent="tCARDS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; CARD_BRAND&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(32)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="r12" parent="tCARDS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; CARD_TYPE&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(32)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="r13" parent="tCARDS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; CREDIT_LIMIT&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; DECIMAL(15,2)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="158" as="geometry" />
+        </mxCell>
+        <mxCell id="r14" parent="tCARDS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#666666&quot;&gt;WM&lt;/b&gt;&amp;nbsp; LAST_UPDATED_TS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; TIMESTAMP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="f15" parent="tCARDS" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;whiteSpace=wrap;overflow=hidden;rounded=0;fontSize=9;fontColor=#666666;fontStyle=2;" value="6 of 14 columns shown  ·  idx IX_CARDS_CUSTOMER  ·  source cards_data.csv" vertex="1">
+          <mxGeometry height="42" width="300" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="tTRANSACTIONS" parent="1" style="swimlane;html=1;childLayout=stackLayout;horizontal=1;startSize=54;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontColor=#1a1a1a;verticalAlign=middle;align=center;rounded=1;arcSize=6;shadow=1;swimlaneFillColor=#ffffff;" value="&lt;b style=&quot;font-size:14px&quot;&gt;NBKI.TRANSACTIONS&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;13,305,915 rows  ·  13.3 M  ·  core fact&lt;/font&gt;" vertex="1">
+          <mxGeometry height="304" width="340" x="480" y="265" as="geometry" />
+        </mxCell>
+        <mxCell id="r16" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#7F3300&quot;&gt;PK&lt;/b&gt;&amp;nbsp; &lt;b&gt;TRANSACTION_ID&lt;/b&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; BIGINT&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="r17" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; TXN_TS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; TIMESTAMP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="r18" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#10739E&quot;&gt;FK&lt;/b&gt;&amp;nbsp; &lt;i&gt;CUSTOMER_ID&lt;/i&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; INTEGER&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="r19" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#10739E&quot;&gt;FK&lt;/b&gt;&amp;nbsp; &lt;i&gt;CARD_ID&lt;/i&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; INTEGER&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="r20" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; AMOUNT&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; DECIMAL(15,2)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="158" as="geometry" />
+        </mxCell>
+        <mxCell id="r21" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; MCC_CODE&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(8)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="r22" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; MERCHANT_ID&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; INTEGER&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="r23" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#666666&quot;&gt;WM&lt;/b&gt;&amp;nbsp; LAST_UPDATED_TS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; TIMESTAMP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="236" as="geometry" />
+        </mxCell>
+        <mxCell id="f24" parent="tTRANSACTIONS" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;whiteSpace=wrap;overflow=hidden;rounded=0;fontSize=9;fontColor=#666666;fontStyle=2;" value="8 of 13 columns shown  ·  idx IX_TXN_TS, IX_TXN_WATERMARK, IX_TXN_CUSTOMER  ·  source transactions_data.csv" vertex="1">
+          <mxGeometry height="42" width="340" y="262" as="geometry" />
+        </mxCell>
+        <mxCell id="tMCC_CODES" parent="1" style="swimlane;html=1;childLayout=stackLayout;horizontal=1;startSize=54;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontColor=#1a1a1a;verticalAlign=middle;align=center;rounded=1;arcSize=6;shadow=1;swimlaneFillColor=#ffffff;" value="&lt;b style=&quot;font-size:14px&quot;&gt;NBKI.MCC_CODES&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;109 rows  ·  reference dimension&lt;/font&gt;" vertex="1">
+          <mxGeometry height="174" width="300" x="1000" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="r25" parent="tMCC_CODES" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#7F3300&quot;&gt;PK&lt;/b&gt;&amp;nbsp; &lt;b&gt;MCC_CODE&lt;/b&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(8)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="r26" parent="tMCC_CODES" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; MCC_DESCRIPTION&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(256)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="r27" parent="tMCC_CODES" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#666666&quot;&gt;WM&lt;/b&gt;&amp;nbsp; LAST_UPDATED_TS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; TIMESTAMP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="f28" parent="tMCC_CODES" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;whiteSpace=wrap;overflow=hidden;rounded=0;fontSize=9;fontColor=#666666;fontStyle=2;" value="all 3 columns shown  ·  source mcc_codes.json" vertex="1">
+          <mxGeometry height="42" width="300" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="tFRAUD_LABELS" parent="1" style="swimlane;html=1;childLayout=stackLayout;horizontal=1;startSize=54;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontColor=#1a1a1a;verticalAlign=middle;align=center;rounded=1;arcSize=6;shadow=1;swimlaneFillColor=#ffffff;" value="&lt;b style=&quot;font-size:14px&quot;&gt;NBKI.FRAUD_LABELS&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;8,914,963 rows  ·  8.9 M  ·  labels&lt;/font&gt;" vertex="1">
+          <mxGeometry height="174" width="300" x="1000" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="r29" parent="tFRAUD_LABELS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#7F3300&quot;&gt;PK&lt;/b&gt;&amp;nbsp; &lt;b&gt;TRANSACTION_ID&lt;/b&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; BIGINT&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="r30" parent="tFRAUD_LABELS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; IS_FRAUD&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(8)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="r31" parent="tFRAUD_LABELS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#666666&quot;&gt;WM&lt;/b&gt;&amp;nbsp; LAST_UPDATED_TS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; TIMESTAMP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="300" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="f32" parent="tFRAUD_LABELS" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;whiteSpace=wrap;overflow=hidden;rounded=0;fontSize=9;fontColor=#666666;fontStyle=2;" value="all 3 columns shown  ·  source train_fraud_labels.json  ·  partial coverage by design" vertex="1">
+          <mxGeometry height="42" width="300" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="tAML" parent="1" style="swimlane;html=1;childLayout=stackLayout;horizontal=1;startSize=54;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontColor=#1a1a1a;verticalAlign=middle;align=center;rounded=1;arcSize=6;shadow=1;swimlaneFillColor=#ffffff;" value="&lt;b style=&quot;font-size:14px&quot;&gt;NBKI.AML_TRANSACTIONS&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;5,078,345 rows  ·  5.1 M  ·  optional dataset&lt;/font&gt;" vertex="1">
+          <mxGeometry height="330" width="340" x="480" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="r33" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#7F3300&quot;&gt;PK&lt;/b&gt;&amp;nbsp; &lt;b&gt;AML_TXN_ID&lt;/b&gt;&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; BIGINT identity&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="r34" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; TXN_TS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; TIMESTAMP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="r35" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; FROM_BANK&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(16)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="r36" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; ACCOUNT_FROM&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(24)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="r37" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; TO_BANK&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(16)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="158" as="geometry" />
+        </mxCell>
+        <mxCell id="r38" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; ACCOUNT_TO&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; VARCHAR(24)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="r39" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; AMOUNT_PAID&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; DECIMAL(23,6)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="r40" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;font style=&quot;color:#b3b3b3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt; IS_LAUNDERING&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; SMALLINT&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="236" as="geometry" />
+        </mxCell>
+        <mxCell id="r41" parent="tAML" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;overflow=hidden;rounded=0;fontSize=11;points=[[0,0.5,0,0,0],[1,0.5,0,0,0]];portConstraint=eastwest;" value="&lt;b style=&quot;color:#666666&quot;&gt;WM&lt;/b&gt;&amp;nbsp; LAST_UPDATED_TS&lt;font style=&quot;color:#4d4d4d&quot;&gt;&amp;nbsp; TIMESTAMP&lt;/font&gt;" vertex="1">
+          <mxGeometry height="26" width="340" y="262" as="geometry" />
+        </mxCell>
+        <mxCell id="f42" parent="tAML" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=left;verticalAlign=middle;spacingLeft=8;spacingRight=8;whiteSpace=wrap;overflow=hidden;rounded=0;fontSize=9;fontColor=#666666;fontStyle=2;" value="9 of 13 columns shown  ·  idx IX_AML_TS, IX_AML_WATERMARK  ·  source HI-Small_Trans.csv" vertex="1">
+          <mxGeometry height="42" width="340" y="288" as="geometry" />
+        </mxCell>
+        <mxCell id="b43" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;fontSize=9;fontColor=#4d4d4d;" value="&lt;b&gt;Standalone by design.&lt;/b&gt; A separate IBM AML dataset with no join to the card model. The source has no natural key, so an identity column supplies one. Carried for volume and for &lt;b&gt;DECIMAL(23,6)&lt;/b&gt; &amp;mdash; scale 2 would silently round the crypto rows to 0.00." vertex="1">
+          <mxGeometry height="66" width="340" x="480" y="1075" as="geometry" />
+        </mxCell>
+        <mxCell id="e44" edge="1" parent="1" source="r10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=8;html=1;jettySize=24;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERone;endFill=0;startSize=12;endSize=12;strokeWidth=2;strokeColor=#333333;dashed=0;" target="r2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="14" y="533" />
+              <mxPoint x="14" y="207" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="el45" connectable="0" parent="e44" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#4d4d4d;labelBackgroundColor=#ffffff;spacing=2;" value="FK_CARDS_CUSTOMERS_1&lt;br&gt;one customer per card" vertex="1">
+          <mxGeometry relative="1" x="-0.38" as="geometry">
+            <mxPoint x="104" y="-16" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e46" edge="1" parent="1" source="r18" style="edgeStyle=entityRelationEdgeStyle;rounded=1;arcSize=8;html=1;jettySize=24;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERone;endFill=0;startSize=12;endSize=12;strokeWidth=2;strokeColor=#333333;dashed=0;" target="r2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="el47" connectable="0" parent="e46" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#4d4d4d;labelBackgroundColor=#ffffff;spacing=2;" value="FK_TRANSACTIONS_CUSTOMERS_1&lt;br&gt;one customer per transaction" vertex="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="18" y="-16" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e48" edge="1" parent="1" source="r19" style="edgeStyle=entityRelationEdgeStyle;rounded=1;arcSize=8;html=1;jettySize=24;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERone;endFill=0;startSize=12;endSize=12;strokeWidth=2;strokeColor=#333333;dashed=0;" target="r9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="el49" connectable="0" parent="e48" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#4d4d4d;labelBackgroundColor=#ffffff;spacing=2;" value="FK_TRANSACTIONS_CARDS_2&lt;br&gt;one card per transaction" vertex="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="18" y="16" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e50" edge="1" parent="1" source="r16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=8;html=1;jettySize=24;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=ERzeroToOne;startFill=0;endArrow=ERzeroToOne;endFill=0;startSize=12;endSize=12;strokeWidth=2;strokeColor=#9673A6;dashed=1;dashPattern=8 6;" target="r29">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="332" />
+              <mxPoint x="900" y="257" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="el51" connectable="0" parent="e50" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#4d4d4d;labelBackgroundColor=#ffffff;spacing=2;" value="no FK &amp;mdash; logical&lt;br&gt;0 or 1 label per transaction&lt;br&gt;8.9 M labels vs 13.3 M rows" vertex="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-46" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e52" edge="1" parent="1" source="r21" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=8;html=1;jettySize=24;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;startSize=12;endSize=12;strokeWidth=2;strokeColor=#9673A6;dashed=1;dashPattern=8 6;" target="r25">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="462" />
+              <mxPoint x="900" y="537" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="el53" connectable="0" parent="e52" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#4d4d4d;labelBackgroundColor=#ffffff;spacing=2;" value="no FK &amp;mdash; logical&lt;br&gt;on MCC_CODE" vertex="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-46" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b54" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#1F3A5F;strokeWidth=2;align=left;verticalAlign=top;spacingLeft=12;spacingRight=12;spacingTop=8;fontSize=11;fontColor=#1a1a1a;shadow=1;" value="&lt;b style=&quot;font-size:13px&quot;&gt;Data volume &amp;mdash; verified, not estimated&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;table cellpadding=&quot;2&quot; style=&quot;width:100%;font-size:11px;border-collapse:collapse&quot;&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;TRANSACTIONS&lt;/b&gt;&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;&lt;b&gt;13,305,915&lt;/b&gt;&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;48.7%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;FRAUD_LABELS&lt;/b&gt;&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;&lt;b&gt;8,914,963&lt;/b&gt;&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;32.6%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;AML_TRANSACTIONS&lt;/b&gt;&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;&lt;b&gt;5,078,345&lt;/b&gt;&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;18.6%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;CARDS&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;6,146&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;0.02%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;CUSTOMERS&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;2,000&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;0.01%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;MCC_CODES&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;109&lt;/td&gt;&lt;td align=&quot;right&quot;&gt;&amp;lt;0.01%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td style=&quot;border-top:1px solid #999999&quot;&gt;&lt;b&gt;Total, 6 tables&lt;/b&gt;&lt;/td&gt;&lt;td align=&quot;right&quot; style=&quot;border-top:1px solid #999999&quot;&gt;&lt;b&gt;27,307,478&lt;/b&gt;&lt;/td&gt;&lt;td align=&quot;right&quot; style=&quot;border-top:1px solid #999999&quot;&gt;&lt;b&gt;100%&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;Fraud labels&lt;/b&gt; &amp;mdash; Yes 13,332 (0.15%) / No 8,901,631. That is 8,914,963 label rows against 13,305,915 transactions, 67.0% by row count. The shortfall is by design, not a load failure. With no FK, the match itself is unverified &amp;mdash; the anti-join belongs in silver.&lt;br&gt;&lt;br&gt;&lt;b&gt;WM &amp;mdash; LAST_UPDATED_TS&lt;/b&gt; is on every table: &lt;i&gt;GENERATED ALWAYS FOR EACH ROW ON UPDATE AS ROW CHANGE TIMESTAMP&lt;/i&gt;. Engine-maintained, verified on 13.3 M rows, and the column an incremental read watermarks on. Two caveats: it does not capture DELETEs, and Fabric&amp;#39;s incremental Db2 read fails in this tenant &amp;mdash; the demo lands full snapshots.&lt;br&gt;&lt;br&gt;&lt;b&gt;Provenance&lt;/b&gt; &amp;mdash; counts verified in Db2 by &lt;i&gt;scripts/05_verify.sh&lt;/i&gt; (23/23) and against the Fabric bronze landing by &lt;i&gt;scripts/17_verify_bronze.py&lt;/i&gt; (77/77), control totals tying exactly.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="495" width="400" x="40" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="b55" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=10;" value="&lt;b style=&quot;font-size:10px&quot;&gt;Relative volume&lt;/b&gt;&lt;font style=&quot;font-size:9px;color:#666666&quot;&gt; &amp;mdash; linear against 13.3 M; the smallest bar is padded to a 3 px minimum&lt;/font&gt;" vertex="1">
+          <mxGeometry height="28" width="374" x="54" y="1088" as="geometry" />
+        </mxCell>
+        <mxCell id="b56" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=9;fontColor=#1a1a1a;" value="TRANSACTIONS &amp;nbsp;13.3 M" vertex="1">
+          <mxGeometry height="16" width="124" x="56" y="1124" as="geometry" />
+        </mxCell>
+        <mxCell id="b57" parent="1" style="rounded=1;arcSize=30;html=1;fillColor=#d79b00;strokeColor=none;" value="" vertex="1">
+          <mxGeometry height="16" width="228" x="186" y="1124" as="geometry" />
+        </mxCell>
+        <mxCell id="b58" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=9;fontColor=#1a1a1a;" value="FRAUD_LABELS &amp;nbsp;8.9 M" vertex="1">
+          <mxGeometry height="16" width="124" x="56" y="1148" as="geometry" />
+        </mxCell>
+        <mxCell id="b59" parent="1" style="rounded=1;arcSize=30;html=1;fillColor=#e8a838;strokeColor=none;" value="" vertex="1">
+          <mxGeometry height="16" width="153" x="186" y="1148" as="geometry" />
+        </mxCell>
+        <mxCell id="b60" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=9;fontColor=#1a1a1a;" value="AML_TRANSACTIONS &amp;nbsp;5.1 M" vertex="1">
+          <mxGeometry height="16" width="124" x="56" y="1172" as="geometry" />
+        </mxCell>
+        <mxCell id="b61" parent="1" style="rounded=1;arcSize=30;html=1;fillColor=#f0c070;strokeColor=none;" value="" vertex="1">
+          <mxGeometry height="16" width="87" x="186" y="1172" as="geometry" />
+        </mxCell>
+        <mxCell id="b62" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=9;fontColor=#1a1a1a;" value="3 small tables &amp;nbsp;8,255" vertex="1">
+          <mxGeometry height="16" width="124" x="56" y="1196" as="geometry" />
+        </mxCell>
+        <mxCell id="b63" parent="1" style="rounded=1;arcSize=30;html=1;fillColor=#6c8ebf;strokeColor=none;" value="" vertex="1">
+          <mxGeometry height="16" width="3" x="186" y="1196" as="geometry" />
+        </mxCell>
+        <mxCell id="b64" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=8;" value="&lt;font style=&quot;font-size:8px;color:#666666&quot;&gt;0.03%&lt;/font&gt;" vertex="1">
+          <mxGeometry height="16" width="90" x="193" y="1196" as="geometry" />
+        </mxCell>
+        <mxCell id="b65" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#999999;strokeWidth=1;align=left;verticalAlign=top;spacingLeft=12;spacingRight=12;spacingTop=8;fontSize=11;fontColor=#1a1a1a;" value="&lt;b style=&quot;font-size:13px&quot;&gt;Legend&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Relationships&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;&amp;#9472;&amp;#9472;&amp;#9472;&lt;/b&gt; solid &amp;mdash; foreign key enforced by Db2 (3 constraints declared in &lt;i&gt;02_tables.sql&lt;/i&gt;)&lt;br&gt;&lt;b style=&quot;color:#9673A6&quot;&gt;&amp;#9548;&amp;#9548;&amp;#9548;&lt;/b&gt; dashed &amp;mdash; logical join only. The columns line up and queries join on them, but no constraint enforces it, so orphans are possible and must be checked in silver.&lt;br&gt;Single bar = exactly one &amp;nbsp;&amp;middot;&amp;nbsp; circle + bar = zero or one &amp;nbsp;&amp;middot;&amp;nbsp; circle + crow&amp;#39;s foot = zero or many.&lt;br&gt;Optionality is drawn as the DDL enforces it: a NOT NULL foreign key makes the child&amp;#39;s parent mandatory, but nothing obliges a customer to hold a card.&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Column markers&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b style=&quot;color:#7F3300&quot;&gt;PK&lt;/b&gt; primary key &amp;nbsp;&amp;nbsp; &lt;b style=&quot;color:#10739E&quot;&gt;FK&lt;/b&gt; foreign key &amp;nbsp;&amp;nbsp; &lt;b style=&quot;color:#666666&quot;&gt;WM&lt;/b&gt; watermark column&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Volume tiers&lt;/b&gt; &lt;font style=&quot;font-size:10px&quot;&gt;(header colour)&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Green &amp;mdash; reference, under 1K rows&lt;br&gt;Blue &amp;mdash; master, 1K to 10K rows&lt;br&gt;Orange &amp;mdash; high volume, over 1M rows&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;Reading the model.&lt;/b&gt; Three tables hold 99.97% of the rows and none of them is a dimension &amp;mdash; this is a narrow-and-deep transactional estate, which is why the demo is about throughput and exact control totals rather than modelling. Only 35 of 61 columns are shown; the full definitions live in &lt;i&gt;db2/ddl/02_tables.sql&lt;/i&gt; and &lt;i&gt;db2/ddl/03_tables_optional.sql&lt;/i&gt;.&lt;br&gt;&lt;br&gt;&lt;b&gt;Sources.&lt;/b&gt; Structure from &lt;i&gt;db2/ddl/01_schema.sql&lt;/i&gt;, &lt;i&gt;02_tables.sql&lt;/i&gt;, &lt;i&gt;03_tables_optional.sql&lt;/i&gt; and &lt;i&gt;overlay.json&lt;/i&gt;; row counts from &lt;i&gt;docs/session-handoff.md&lt;/i&gt; and &lt;i&gt;docs/runbook-phase1.md&lt;/i&gt;.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="495" width="380" x="920" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="QuxONXoqReRvFrAymYQP-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#999999;strokeWidth=1;align=left;verticalAlign=top;spacingLeft=12;spacingRight=12;spacingTop=8;fontSize=11;fontColor=#1a1a1a;" value="&lt;b style=&quot;font-size:13px&quot;&gt;Legend&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Relationships&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;&amp;#9472;&amp;#9472;&amp;#9472;&lt;/b&gt; solid &amp;mdash; foreign key enforced by Db2 (3 constraints declared in &lt;i&gt;02_tables.sql&lt;/i&gt;)&lt;br&gt;&lt;b style=&quot;color:#9673A6&quot;&gt;&amp;#9548;&amp;#9548;&amp;#9548;&lt;/b&gt; dashed &amp;mdash; logical join only. The columns line up and queries join on them, but no constraint enforces it, so orphans are possible and must be checked in silver.&lt;br&gt;Single bar = exactly one &amp;nbsp;&amp;middot;&amp;nbsp; circle + bar = zero or one &amp;nbsp;&amp;middot;&amp;nbsp; circle + crow&amp;#39;s foot = zero or many.&lt;br&gt;Optionality is drawn as the DDL enforces it: a NOT NULL foreign key makes the child&amp;#39;s parent mandatory, but nothing obliges a customer to hold a card.&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Column markers&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b style=&quot;color:#7F3300&quot;&gt;PK&lt;/b&gt; primary key &amp;nbsp;&amp;nbsp; &lt;b style=&quot;color:#10739E&quot;&gt;FK&lt;/b&gt; foreign key &amp;nbsp;&amp;nbsp; &lt;b style=&quot;color:#666666&quot;&gt;WM&lt;/b&gt; watermark column&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Volume tiers&lt;/b&gt; &lt;font style=&quot;font-size:10px&quot;&gt;(header colour)&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Green &amp;mdash; reference, under 1K rows&lt;br&gt;Blue &amp;mdash; master, 1K to 10K rows&lt;br&gt;Orange &amp;mdash; high volume, over 1M rows&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;Reading the model.&lt;/b&gt; Three tables hold 99.97% of the rows and none of them is a dimension &amp;mdash; this is a narrow-and-deep transactional estate, which is why the demo is about throughput and exact control totals rather than modelling. Only 35 of 61 columns are shown; the full definitions live in &lt;i&gt;db2/ddl/02_tables.sql&lt;/i&gt; and &lt;i&gt;db2/ddl/03_tables_optional.sql&lt;/i&gt;.&lt;br&gt;&lt;br&gt;&lt;b&gt;Sources.&lt;/b&gt; Structure from &lt;i&gt;db2/ddl/01_schema.sql&lt;/i&gt;, &lt;i&gt;02_tables.sql&lt;/i&gt;, &lt;i&gt;03_tables_optional.sql&lt;/i&gt; and &lt;i&gt;overlay.json&lt;/i&gt;; row counts from &lt;i&gt;docs/session-handoff.md&lt;/i&gt; and &lt;i&gt;docs/runbook-phase1.md&lt;/i&gt;.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="495" width="380" x="930" y="740" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
