@@ -182,9 +182,28 @@ than the polished one.
 | Status | Claim |
 |---|---|
 | **Proven, on this data** | Six-table Db2 → bronze landing; 77/77 reconciliation; 27.3M rows in 10m31s; decimals and timestamps preserved exactly |
-| **Available, not applied** | Row-level audit columns — Copy job supports them and they are exactly the provenance this deck promises, but they are **not configured here**. The JSON shape is unpublished and a guessed one was rejected; it needs a portal pass. Do not show a provenance column that does not exist |
+| **Proven, on this data** | **Silver** — conform, validate, quarantine. 42/42, `clean + quarantine = bronze` on row count *and* control total. PAN masked to last four, CVV dropped entirely |
+| **Proven, on this data** | **Gold** — a two-star dimensional model in a Warehouse, 47/47. No orphan keys, totals tie to silver, 4.4M unlabelled transactions preserved by the left join |
+| **Available, not applied** | Row-level audit columns on *bronze* — Copy job supports them but the JSON shape is unpublished and a guessed one was rejected. *Silver stamps its own `_silver_batch_id` on every row, so provenance does exist from silver onwards* |
 | **Tested and does NOT work** | Fabric Copy job **incremental** from Db2 (see below) |
-| **Not built** | Silver, quarantine, gold, Direct Lake model, RLS, Purview lineage, Excel/agent consistency |
+| **Not built** | The Dataflow Gen2 over the CSV drop (Power Query written, needs a portal pass), the orchestration pipeline, the Direct Lake model, RLS, Purview lineage |
+
+### Two beats silver and gold add, and both were found rather than planted
+
+- **The nulls were a channel, not missing data.** `MERCHANT_STATE` is null on
+  11.75% of transactions — and that set is *exactly* `MERCHANT_CITY = 'ONLINE'`,
+  1,563,700 rows, coincident to the row. A naive load calls 1.56M good
+  transactions "unknown location". This one models them as `Online`.
+- **5,788 card-present transactions at a card-not-present merchant.** Swipe or
+  Chip, at an online-only merchant. That is implausible on its face and is the
+  shape of a card-testing signal. Nobody seeded it; profiling found it.
+
+> **The strongest data-quality line is the one about the rules that find
+> nothing.** Silver runs eight rules. Against the governed Db2 source only two
+> fire. The other six — impossible amounts, future dates, duplicate keys,
+> whitespace and casing damage — return zero, every time. Run the identical rules
+> over the hand-made CSV extract and they light up. *That* is the difference
+> between a governed source and a spreadsheet, demonstrated rather than asserted.
 
 > **Do not say "scheduled pipeline, incremental, on a watermark".** Say: *a full
 > extract that runs in ten and a half minutes, which is faster than the manual
