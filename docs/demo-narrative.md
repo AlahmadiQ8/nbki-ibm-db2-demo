@@ -237,6 +237,61 @@ than the polished one.
 
 ---
 
+## Slide 4 — Their target architecture, mapped onto Fabric
+
+**Asset:** `docs/architecture/nbki-target-to-fabric.drawio.png`
+
+NBKI sent their own tentative target architecture ahead of the session. This
+slide is that sketch, redrawn. Their four stages are kept exactly as they
+numbered them — Data Source, Integration Layer, Data Fabric Platform,
+Consumption — so they recognise their own thinking; what changes is how each
+stage is actually built in Fabric. Numbered markers key to a legend strip
+explaining each change.
+
+Use it at the close, in place of the bare LUW → Db2 for i table. It carries
+that mapping and quite a lot more.
+
+### Speaker notes
+
+- **Open by crediting the draft, because it deserves it.** They put the
+  on-premises data gateway in the right place, which is the thing most people
+  new to Fabric get wrong. Say that before anything else.
+- **The one correction that matters is their "Real-Time CDC" box.** It is a
+  reasonable thing to assume and it does not hold: Db2 is not a CDC source for
+  Copy job, there is no Mirroring for Db2, and the watermark-incremental read
+  was tested here and **fails**. Give them the 109-row reproduction if they
+  want it. Then land the positive — a full load of 27.3M rows in 10m31s is
+  faster than what they do by hand today, and it is repeatable.
+- **Their draft cleans the data before it lands.** That is the ETL habit, and
+  it is the single most useful architectural correction on the slide: Fabric
+  lands raw into bronze first and transforms between layers, which is what
+  makes a reload deterministic and the landing replayable.
+- **They had no medallion at all** — a lakehouse and a warehouse side by side.
+  Walk bronze → silver → gold, then the quarantine table, which is where the
+  data-quality story from Slide 1 finally has somewhere to live.
+- **The lakehouse/warehouse question will come up.** Fabric asks you to choose
+  by development style. This build is Delta and Spark first, so gold is a
+  lakehouse and its SQL analytics endpoint covers read-only T-SQL. A Warehouse
+  is still the right answer if they want T-SQL-first ELT, stored procedures or
+  multi-table transactions — do not tell them the endpoint replaces one.
+- **Watch for the RLS assumption.** Row-level security on the semantic model
+  does **not** govern someone querying the SQL endpoint directly. The diagram
+  says so; say it too, because a bank will assume otherwise.
+- **Their "audited data exports" box is the delicate one.** Scheduled exports
+  are legitimate, but a scheduled job runs under its own identity rather than
+  the recipient's, so distribution needs designing. Worth knowing: a Power BI
+  export carries its sensitivity label into Excel, but not into CSV.
+- **Two sources are drawn on purpose.** Equation on Db2 for i is dashed,
+  because that is the target and we have not connected to it. Db2 LUW on an
+  Azure VM is solid, because that is where every measured figure came from. Do
+  not let the room leave thinking we benchmarked their IBM i.
+
+> Solid mint means built and tested; dashed means designed. Only the demo
+> source, the gateway, the full load and bronze are solid. That is the whole
+> honesty mechanism of the slide, so do not paint over it.
+
+---
+
 ## Lines not to cross
 
 Carried from [`docs/roadmap.md`](roadmap.md) and
