@@ -223,13 +223,110 @@ imply otherwise.
       values). Not applied: the JSON shape is unpublished, and an unverified one
       was **rejected with HTTP 400**. Needs one portal pass, then `--export`,
       then a re-land, since it adds columns.
-- [ ] **Silver** — conform types, resolve the three date formats, apply the DQ
-      rules, quarantine failures rather than dropping them.
-- [ ] **Gold** — dimensional model for the semantic layer.
-- [ ] **Semantic model** — Direct Lake.
+      *(Partly mitigated: silver now stamps its own `_silver_batch_id` and
+      `_silver_loaded_at` on every row, so provenance exists from silver
+      onwards.)*
+- [x] **Silver, complete and verified** — `lh_silver`, built by the PySpark
+      notebook `nb_silver` (source: `fabric/notebooks/nb_silver.py`, deployed by
+      `scripts/20_deploy_silver.py`). Runs in **208s**. Verified **42/42** by
+      `scripts/21_verify_silver.py`: `clean + quarantine = bronze` on both row
+      count and control total, PAN masked, CVV dropped, no `timestamp_ntz`,
+      decimal precision preserved.
+- [x] **Gold, complete and verified** — `wh_gold`, a Warehouse, built in T-SQL
+      (source: `fabric/notebooks/nb_gold.sql`, deployed by
+      `scripts/22_deploy_gold.py`). **76 statements in 130s.** Two stars sharing
+      a conformed `dim_date`. Verified by `scripts/23_verify_gold.py`.
+- [x] **Silver CSV path — the Dataflow Gen2** — created by
+      `scripts/25_deploy_dataflow.py` from the committed Power Query
+      (`fabric/dataflows/df_silver_csv.pq`), which handles all twelve planted
+      CSV defects. The three extracts are uploaded to `lh_bronze/Files/csv_drop/`
+      by `scripts/24_upload_csv_drop.py`.
+      **One manual step remains:** set the output destination in the portal.
+      The destination binding is *not* in the published dataflow definition
+      schema — the documented parts are `mashup.pq`, `queryMetadata.json` and
+      optional `.mdf` transforms, and none describes a Lakehouse sink. Rather
+      than guess a shape and ship something that looks configured and is not,
+      it is two clicks. (This is the same rule that the bronze audit columns
+      broke, with an HTTP 400 to show for it.)
+- [x] **Orchestration pipeline** — `pl_medallion`, created and **run end to end
+      in 398s**: `nb_silver` → `nb_gold_runner`, both verified afterwards.
+      Deployed by `scripts/26_deploy_pipeline.py`.
+      Two legs are deliberately left for the portal: the **Copy job**, because
+      its activity's wait-and-return behaviour is undocumented and it re-lands
+      27.3M rows in 10m31s; and the **Dataflow**, until its destination is set.
+- [ ] **Semantic model** — Direct Lake **on OneLake** over `wh_gold`.
 - [ ] **Power BI report** — deliberately rebuild something close to what they
       have today, so the comparison is like-for-like.
 - [ ] **Fabric data agent** — needs a paid **F2+** capacity. F8 is available.
+
+> **The SQL analytics endpoint refresh is not optional and is already handled.**
+> Gold reads silver by three-part name, and that endpoint lags a Spark write by a
+> background sync. Build gold too soon and it silently produces a perfectly
+> plausible star schema on stale numbers. `nb_gold_runner` calls the refresh REST
+> API as its first act, and `scripts/22_deploy_gold.py` calls it too. A pipeline
+> activity exists for this; the REST call was used instead so that no unverified
+> JSON shape was committed.
+
+### What silver and gold proved
+
+**Why gold is a Warehouse, not a second Lakehouse.** T-SQL cannot write to a
+Lakehouse — the SQL analytics endpoint is read-only. A T-SQL-authored gold layer
+*must* be a Warehouse. It is also the better answer: V-Order is on by default
+there and off by default in new Spark workspaces, and compaction is automatic.
+
+**Profiling changed the model before a line of DDL was written.** `MERCHANT_ID`
+looked like a merchant dimension key. It is not: 16,164 of 74,831 merchants
+(22%) appear with more than one city, one with **2,579 cities** and another with
+**4,337 ZIPs**. Location is a property of the transaction, not the merchant. So
+merchant is a **degenerate dimension** on the fact and location became
+`dim_location` (25,426 rows).
+
+**The 11.75% null `MERCHANT_STATE` is not missing data.** It is *exactly*
+`MERCHANT_CITY = 'ONLINE'` — 1,563,700 rows, coincident to the row. Those are
+online transactions. Routing them to an `Unknown` member, as originally planned,
+would have mislabelled 1.56M good rows.
+
+**A genuine anomaly, found rather than planted.** 5,788 transactions are
+card-present (`Swipe`/`Chip`) at an online-only merchant. That is the shape of a
+card-testing signal, and it is a stronger demo beat than anything we seeded.
+
+**Two DQ rules had to be abandoned on the evidence.** The largest transaction in
+the set is **6,820.20**, so `implausible_amount` finds nothing at any sane
+threshold. And 660,049 rows (5.0%) are legitimately negative — refunds and
+reversals — so `negative_non_refund` would have quarantined ~650,000 valid rows
+and destroyed the control total. The source carries **no refund indicator**,
+which is itself a finding worth giving the customer.
+
+**The twelve planted violations are NOT in bronze**, because the delta is
+unspent (`18_assert_pristine.sh` 3/3) and bronze was landed from the pristine
+baseline. Silver implements all eight rules; against the governed Db2 source
+only **two** fire — `zero_amount` (10,639) and `channel_location_mismatch`
+(5,788). **The six that find nothing are the argument**: a governed source
+cannot produce those defects, and the hand-made CSV produces them by the dozen.
+Run the same rules over both and the contrast is the demo.
+
+### The trap that matters most
+
+Adding an "Unknown" member to `dim_transaction_error` with `error_flags = NULL`
+collided with the legitimate `None` member. The NULL-matching join then fanned
+**13.08M rows out to 26.4M** — no error, no warning, a complete and
+plausible-looking star schema with every total exactly twice what it should be.
+
+It was caught only because `23_verify_gold.py` compares gold back to silver.
+Never join a fact to a dimension on a nullable column; `gold_validation` now
+carries explicit fan-out guards. This is the best available argument for why the
+verification scripts exist.
+
+### Other traps hit while building
+
+| Trap | Consequence |
+|---|---|
+| **T-SQL notebooks cannot be run by the job API** | `RunNotebook` always starts a *Spark* session, so T-SQL is parsed as Spark SQL and fails. Reproduced twice. Hence two artefacts: `nb_gold` (interactive) and `nb_gold_runner` (PySpark + JDBC, same statements, same warehouse engine) |
+| **CTAS infers `ROW_NUMBER()` as nullable** | `PRIMARY KEY` refused. Every surrogate key is wrapped in `ISNULL(..., -1)`; `ALTER COLUMN` is still preview |
+| **A Warehouse writes Delta with column mapping** | Parquet columns are opaque `col-<guid>`. `_onelake.read_columns()` now resolves logical → physical; a Lakehouse is unaffected |
+| **`updateDefinition?updateMetadata=True`** | Fails 400 without a `.platform` part |
+| **Runtime is 1.3, not 2.0** | **No liquid clustering** — on 1.3 every `OPTIMIZE` rewrites the whole table. No loss: `TRANSACTIONS` is already one 308 MB file, 3 row groups, which is the ideal Direct Lake layout. **Do not partition** |
+| **Warehouse collation is case-sensitive** | `Latin1_General_100_BIN2_UTF8` confirmed. `ca` ≠ `CA` in T-SQL, so casing must be normalised in silver |
 
 > Two things to carry forward. **Build in the portal and export with
 > `scripts/16_fabric_pipeline.sh --export`** — three hand-authored pipeline

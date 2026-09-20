@@ -14,13 +14,90 @@ exists right now. The other documents explain *why* things are the way they are:
 
 ## Where this got to
 
-**Phases 1 and 2 are complete. Bronze is now landed and verified** — all six
-tables, 27,307,478 rows, in `lh_bronze` as Delta, reconciling to the source
-exactly. Next is **silver**; see `docs/roadmap.md`.
+**Phases 1 and 2 are complete. Bronze, silver and gold are all built and
+verified.** Bronze holds all six tables, 27,307,478 rows. Silver conforms and
+quarantines them (**42/42**). Gold is a two-star dimensional model in a Warehouse
+(**47/47**). What remains is the Dataflow Gen2, the orchestration pipeline, and
+the semantic model — see `docs/roadmap.md` Phase 3.
 
 Read the two findings under "What bronze proved, and what it disproved" before
 saying anything about incremental to a customer. One of them retires a claim the
 previous handoff was optimistic about.
+
+### The medallion, as built
+
+| Layer | Item | Built by | Time | Verified |
+|---|---|---|---|---|
+| Bronze | `lh_bronze` (Lakehouse) | Copy job `cj_bronze_db2` | 10m31s | **77/77** |
+| Silver | `lh_silver` (Lakehouse) | **PySpark** `nb_silver` | 208s | **42/42** |
+| Gold | `wh_gold` (**Warehouse**) | **T-SQL** `nb_gold` | 130s | **47/47** |
+| CSV path | `df_silver_csv` | **Dataflow Gen2** | — | needs a destination, see below |
+| Orchestration | `pl_medallion` | pipeline | **398s end to end** | ran clean |
+
+**`pl_medallion` is the button to press in the demo.** It runs silver then gold
+and has been run to completion; both layers verify afterwards.
+
+Sources of truth live in the repo, not the portal:
+
+| File | What it is |
+|---|---|
+| `fabric/notebooks/nb_silver.py` | The silver notebook. Deploy with `scripts/20_deploy_silver.py` |
+| `fabric/notebooks/nb_gold.sql` | The gold build in T-SQL. Deploy with `scripts/22_deploy_gold.py` |
+| `fabric/dataflows/df_silver_csv.pq` | Power Query for the CSV drop. Deploy with `scripts/25_deploy_dataflow.py` |
+| `scripts/_fabric.py` | Fabric REST: deploy items, run them, poll, refresh the SQL endpoint |
+| `scripts/26_deploy_pipeline.py` | The orchestration pipeline |
+| `scripts/21_verify_silver.py` / `23_verify_gold.py` | The proof |
+
+### The one manual step left
+
+`df_silver_csv` exists with both queries and every CSV defect handled, but has
+**no output destination**. That binding is not in the published dataflow
+definition schema, so it was not guessed:
+
+    open df_silver_csv -> select CsvTransactions
+      -> Add data destination -> Lakehouse -> lh_silver
+      -> table slv_csv_transactions -> Replace
+      -> turn OFF "use automatic settings"
+    repeat for MccCodes -> slv_mcc_codes
+
+That last toggle matters: on automatic, the destination table is dropped and
+recreated on every refresh, taking relationships and measures with it.
+
+Then add the Dataflow leg to `pl_medallion` in the portal.
+
+### Live item IDs
+
+| Item | ID |
+|---|---|
+| Lakehouse `lh_silver` | `954f8d69-eae5-4bc7-9334-0b14ac82dd1e` |
+| Warehouse `wh_gold` | `be1fe7e3-c8be-4f90-b7ee-76b3d603f40d` |
+| `lh_silver` SQL endpoint | `2d3b8990-c985-48ac-9faf-b5a9e2c7f54b` |
+| `wh_gold` SQL endpoint | `2yewpa3sn2ee7i3dbmjaxstshe-yw6iixex6swe5nm3lqvdnpwgde.datawarehouse.fabric.microsoft.com` |
+| Pipeline `pl_medallion` | `923beebd-2e8d-4ca6-ac34-09ccc69108d8` |
+
+> The `StagingLakehouseForDataflows_*` and `StagingWarehouseForDataflows_*` items
+> are created automatically by Dataflow Gen2. Leave them alone.
+
+### Three things that will surprise you
+
+**There is no T-SQL client on this workstation** — no ODBC driver, no pyodbc, and
+the `fabric-sqlendpoint` MCP tool answers `-32601 method not found`. Gold is
+therefore executed *by Fabric*: `nb_gold_runner` is a PySpark notebook that opens
+a JDBC connection to the warehouse (token audience **`pbi`**) and runs the
+statements one at a time, logging each to `lh_silver.gold_build_log`. Read that
+log with `scripts/23_verify_gold.py --log`.
+
+**A T-SQL notebook cannot be run by the job API.** `RunNotebook` always starts a
+Spark session, so the T-SQL is parsed as Spark SQL and fails. `nb_gold` is for
+running interactively in the portal — which is what you want on demo day anyway.
+`nb_gold_runner` is for automation. Both are generated from the same `.sql`.
+
+**A Warehouse writes Delta with column mapping** (`mode = name`), so its Parquet
+columns are opaque `col-<guid>`. `_onelake.read_columns()` resolves logical to
+physical; a Lakehouse is unaffected. Reading a warehouse table by its real column
+name without that indirection fails with *"Field does not exist in schema"*.
+
+---
 
 ### Proven, by running it
 
@@ -33,8 +110,24 @@ previous handoff was optimistic about.
 | `15_client_test.py` over TLS as `FABRICRO` | **7/7**, DELETE refused `SQL0551N` |
 | **`17_verify_bronze.py` — bronze vs source** | **77/77**, every control total exact |
 | **Bronze initial load, six tables** | **27,307,478 rows in 10m31s** (~43k rows/s) |
+| **`21_verify_silver.py` — silver vs bronze** | **42/42**, `clean + quarantine = bronze` |
+| **`23_verify_gold.py` — gold vs silver** | **47/47**, no orphans, totals tie |
 | Copy job **incremental** leg | **FAILS** — reproducible, see below |
 | Public exposure | **none** — VPN + Bastion only |
+
+### The numbers silver and gold produce
+
+| Figure | Value |
+|---|---|
+| Transactions conserved, bronze → silver | **13,305,915** (13,289,488 clean + 16,427 quarantined) |
+| Control total conserved | **571,835,522.28** = 572,138,966.70 clean + (−303,444.42) quarantined |
+| AML conserved | **5,078,345** rows, **22,899,645,860,702.707573** — ties to six decimal places |
+| `zero_amount` quarantined | 10,639 |
+| `channel_location_mismatch` quarantined | 5,788 — *card-present at a card-not-present merchant* |
+| Rules that find nothing on the governed source | 5 of 8 — **this is the argument, not a shortfall** |
+| `fact_card_transaction` | **13,289,488** rows, ties to silver exactly |
+| Unlabelled transactions preserved by the LEFT join | **4,385,608** |
+| `dim_location` | 25,426 rows, one `Online` member |
 
 > **Scope correction, carried forward.** `09_reconcile.sh` is **7 checks against
 > each of 3 monthly transaction extracts** — it covers the CSV fallback path for
